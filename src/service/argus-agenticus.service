@@ -1,0 +1,12 @@
+[Unit]
+Description=Argus Agenticus Daemon
+After=graphical-session.target
+
+[Service]
+Environment=RUST_LOG=debug
+ExecStart=%h/.local/bin/argus-agenticus
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

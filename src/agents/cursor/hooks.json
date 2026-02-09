@@ -1,0 +1,38 @@
+{
+    "version": 1,
+    "hooks": {
+        "sessionStart": [
+            { "command": "bash ~/.claude/hooks/events-to-socket.sh" }
+        ],
+        "beforeSubmitPrompt": [
+            { "command": "bash ~/.claude/hooks/events-to-socket.sh" }
+        ],
+        "preToolUse": [
+            { "command": "bash ~/.claude/hooks/events-to-socket.sh" }
+        ],
+        "beforeShellExecution": [
+            { "command": "bash ~/.claude/hooks/events-to-socket.sh" }
+        ],
+        "beforeMCPExecution": [
+            { "command": "bash ~/.claude/hooks/events-to-socket.sh" }
+        ],
+        "afterShellExecution": [
+            { "command": "bash ~/.claude/hooks/events-to-socket.sh" }
+        ],
+        "afterMCPExecution": [
+            { "command": "bash ~/.claude/hooks/events-to-socket.sh" }
+        ],
+        "postToolUse": [
+            { "command": "bash ~/.claude/hooks/events-to-socket.sh" }
+        ],
+        "postToolUseFailure": [
+            { "command": "bash ~/.claude/hooks/events-to-socket.sh" }
+        ],
+        "stop": [
+            { "command": "bash ~/.claude/hooks/events-to-socket.sh" }
+        ],
+        "sessionEnd": [
+            { "command": "bash ~/.claude/hooks/events-to-socket.sh" }
+        ]
+    }
+}

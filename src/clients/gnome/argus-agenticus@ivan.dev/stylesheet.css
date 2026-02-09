@@ -1,0 +1,64 @@
+.agent-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+}
+
+.agent-dot-cursor {
+    border-radius: 3px;
+}
+
+.agent-dot-started {
+    background-color: #2ecc71;
+}
+
+.agent-dot-awaiting {
+    background-color: #e74c3c;
+}
+
+.agent-dot-working {
+    background-color: #f39c12;
+}
+
+.agent-dot-processing {
+    background-color: #f39c12;
+}
+
+.agent-dot-completed {
+    background-color: #3498db;
+}
+
+.agent-dot-ended {
+    background-color: #7f8c8d;
+}
+
+.agent-group {
+    border-radius: 6px;
+    padding: 0;
+}
+
+.agent-group-focused {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+}
+
+.argus-logo {
+    margin-right: 4px;
+}
+
+.auto-focus-button {
+    padding: 4px 6px;
+    margin-right: 4px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.auto-focus-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.auto-focus-button.auto-focus-enabled {
+    color: #e74c3c;
+}

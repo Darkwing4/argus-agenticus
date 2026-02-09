@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.argus-agenticus"
+          path="/org/gnome/shell/extensions/argus-agenticus/">
+    <key type="as" name="focus-next-awaiting">
+      <default><![CDATA[['<Super>F2']]]></default>
+    </key>
+
+    <key type="b" name="auto-focus-enabled">
+      <default>false</default>
+    </key>
+
+    <key type="i" name="focus-delay-ms">
+      <default>1000</default>
+      <range min="0" max="10000"/>
+    </key>
+
+    <key type="i" name="input-idle-threshold-ms">
+      <default>1000</default>
+      <range min="100" max="10000"/>
+    </key>
+  </schema>
+</schemalist>
