@@ -15,8 +15,8 @@ Monitor and manage multiple AI coding agents from your desktop panel.
 
 Running multiple AI agents across terminals, workspaces, and monitors hits a hard limit: **developer attention**.
 
-> *"With one agent I waited for Claude. With two — I waited less. With three — Claude waits for me. I became the bottleneck. And the bottleneck is planning."*
-> — Robert C. Martin
+> *"With one agent, I used to wait for Claude. With two agents I still waited for Claude, but not as long. With three agents Claude is waiting for me. I am the bottleneck. And the bottleneck is all planning."*
+> — [Robert C. Martin](https://x.com/unclebobmartin/status/2016544529826926618)
 
 Planning isn't the only bottleneck — there's also the **attention limit**. 9 terminals, 6 workspaces, one agent has been waiting for permission approval for 8 hours and you didn't even notice.
 
