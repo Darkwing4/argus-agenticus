@@ -10,7 +10,7 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const AGENT_TYPES = {
     claude: {
-        wmClasses: ['Ptyxis', 'org.gnome.Ptyxis'],
+        wmClasses: [],
         dotClass: null,
     },
     cursor: {
@@ -19,7 +19,7 @@ const AGENT_TYPES = {
     },
 };
 
-const ALL_WM_CLASSES = Object.values(AGENT_TYPES).flatMap(t => t.wmClasses);
+let ALL_WM_CLASSES = Object.values(AGENT_TYPES).flatMap(t => t.wmClasses);
 const HOVER_SCALE = 1.2;
 const MARGIN_SAME_GROUP = 0;
 const MARGIN_DIFFERENT_GROUP = 6;
@@ -89,12 +89,17 @@ class AgentsView extends St.BoxLayout {
     }
 
     _setupSettings() {
+        this._updateTerminalWmClasses();
         this._autoFocusEnabled = this._settings.get_boolean('auto-focus-enabled');
         this._focusDelayMs = this._settings.get_int('focus-delay-ms');
         this._inputIdleThresholdMs = this._settings.get_int('input-idle-threshold-ms');
 
         this._settingsChangedId = this._settings.connect('changed', (settings, key) => {
             switch (key) {
+                case 'terminal-wm-classes':
+                    this._updateTerminalWmClasses();
+                    this._scanExistingWindows();
+                    break;
                 case 'auto-focus-enabled':
                     this._autoFocusEnabled = settings.get_boolean(key);
                     this._updateAutoFocusButtonStyle();
@@ -110,6 +115,16 @@ class AgentsView extends St.BoxLayout {
                     break;
             }
         });
+    }
+
+    _updateTerminalWmClasses() {
+        AGENT_TYPES.claude.wmClasses = this._settings.get_strv('terminal-wm-classes');
+        ALL_WM_CLASSES = Object.values(AGENT_TYPES).flatMap(t => t.wmClasses);
+    }
+
+    _scanExistingWindows() {
+        for (const actor of global.get_window_actors())
+            this._trackWindow(actor.meta_window);
     }
 
     _setupLogo() {

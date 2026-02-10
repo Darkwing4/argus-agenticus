@@ -19,5 +19,9 @@
       <default>1000</default>
       <range min="100" max="10000"/>
     </key>
+
+    <key type="as" name="terminal-wm-classes">
+      <default><![CDATA[['Ptyxis', 'org.gnome.Ptyxis', 'Alacritty', 'kitty', 'foot', 'org.wezfurlong.wezterm', 'gnome-terminal-server', 'Tilix', 'com.raggesilver.BlackBox']]]></default>
+    </key>
   </schema>
 </schemalist>
