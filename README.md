@@ -24,7 +24,7 @@ Planning isn't the only bottleneck — there's also the **attention limit**. 9 t
 
 ## How It Works
 
-Every running agent gets a colored indicator in your desktop panel:
+Every running cli-agent gets a colored indicator in your desktop panel:
 
 | Color | State | Meaning |
 |-------|-------|---------|
