@@ -8,7 +8,28 @@ Thus was born **Argus Agenticus** — the watcher of agents.
 
 ## Installation
 
-> **Section in progress.** Detailed installation instructions coming soon.
+### Quick install (Linux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/darkwing4/argus-agenticus/main/install.sh | bash
+```
+
+### From source
+
+```bash
+git clone https://github.com/darkwing4/argus-agenticus.git
+cd argus-agenticus
+./install.sh
+```
+
+### Requirements
+
+- [Rust](https://rustup.rs/) toolchain (`cargo`)
+- `jq`
+- `socat` or `netcat`
+- GNOME 49+ with Wayland (for the desktop extension)
+
+The installer will build the daemon, configure agent hooks for Claude Code (and Cursor if installed), set up the systemd service, and install the GNOME extension.
 
 ## Why?
 
