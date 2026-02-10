@@ -1,10 +1,44 @@
 # Argus Agenticus
 
+Monitor and manage multiple AI coding agents from your desktop panel.
+
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+![Linux](https://img.shields.io/badge/Linux-Wayland%2FGNOME-informational)
+![Rust](https://img.shields.io/badge/Daemon-Rust-orange)
+![Claude Code](https://img.shields.io/badge/Claude_Code-supported-green)
+![Cursor](https://img.shields.io/badge/Cursor_CLI-supported-green)
 
-**Argus Panoptes** (Ancient Greek: Ἄργος Πανόπτης — "all-seeing") was a hundred-eyed giant from Greek mythology, appointed by Hera to watch over Io. Some of his eyes were always awake while the others slept — the perfect guardian who never misses a thing. **Agenticus** — because he watches not nymphs, but AI agents; the Latin suffix *-icus* means "related to / belonging to."
+<!-- TODO: add demo GIF here -->
+<!-- ![demo](assets/demo.gif) -->
 
-Thus was born **Argus Agenticus** — the watcher of agents.
+## The Problem
+
+Running multiple AI agents across terminals, workspaces, and monitors hits a hard limit: **developer attention**.
+
+> *"With one agent I waited for Claude. With two — I waited less. With three — Claude waits for me. I became the bottleneck. And the bottleneck is planning."*
+> — Robert C. Martin
+
+Planning isn't the only bottleneck — there's also the **attention limit**. 9 terminals, 6 workspaces, one agent has been waiting for permission approval for 8 hours and you didn't even notice.
+
+**Argus Agenticus solves the "forgotten agent" problem.**
+
+## How It Works
+
+Every running agent gets a colored indicator in your desktop panel:
+
+| Color | State | Meaning |
+|-------|-------|---------|
+| 🟢 Green | `started` | Idle, no active task |
+| 🔴 Red | `awaiting` | Needs permission or approval — don't forget about it |
+| 🟡 Yellow | `working` | Agent is busy, everything is fine |
+| 🔵 Blue | `completed` | Task finished, terminal not yet opened — "Unread" |
+
+## Features
+
+- **Click an indicator** — focus the agent's window, even across workspaces
+- **Super+F2** — cycle to the next agent, sorted by priority: 🔴 → 🔵 → 🟢 → 🟡
+- **Auto-focus on 🔴** — Argus automatically switches your screen (when idle) to each agent that needs attention, and returns you back when no 🔴 agents remain
+- **Visual grouping** — agents are grouped by physical monitors and workspaces
 
 ## Installation
 
@@ -31,39 +65,10 @@ cd argus-agenticus
 
 The installer will build the daemon, configure agent hooks for Claude Code (and Cursor if installed), set up the systemd service, and install the GNOME extension.
 
-## Why?
-
-CLI agents like Claude Code and Cursor Agent have become essential developer tools. Working with multiple agents simultaneously is powerful — but it hits a hard limit: **developer attention**.
-
-> *"With one agent I waited for Claude. With two — I waited less. With three — Claude waits for me. I became the bottleneck. And the bottleneck is planning."*
-> — Robert C. Martin
-
-Planning isn't the only bottleneck — there's also the **attention limit**. With multiple agents running across terminals, workspaces, and monitors, it's easy to lose track: an agent has been waiting for permission approval for 8 hours and you didn't even notice. You constantly jump between windows checking who you forgot to respond to.
-
-**Argus Agenticus solves the "forgotten agent" problem.**
-
-## How It Works
-
-Argus displays the state of every running agent as a colored indicator in your desktop panel:
-
-| Color | State | Meaning |
-|-------|-------|---------|
-| 🟢 Green | `started` | Idle, no active task |
-| 🔴 Red | `awaiting` | Needs permission or approval — don't forget about it |
-| 🟡 Yellow | `working` | Agent is busy, everything is fine |
-| 🔵 Blue | `completed` | Task finished, but you haven't opened the terminal yet — "Unread" |
-
-## Features
-
-- **Click an indicator** — focus the agent's window, even across workspaces
-- **Super+F2** — cycle to the next agent, sorted by priority: 🔴 → 🔵 → 🟢 → 🟡
-- **Auto-focus on 🔴** — Argus automatically switches your screen (when idle) to each agent that needs attention, and returns you back when no 🔴 agents remain
-- **Visual grouping** — agents are grouped by physical monitors and workspaces
-
 ## Supported Agents
 
-| Agent | Shape | Link |
-|-------|-------|------|
+| Agent | Indicator | Link |
+|-------|-----------|------|
 | Claude Code | Circle | [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code) |
 | Cursor Agent (CLI) | Square | [cursor.com](https://www.cursor.com/) |
 
@@ -89,6 +94,12 @@ Other multiplexers will be supported in the future.
 ### Terminals
 
 Any terminal emulator with a WM Class is supported (Ptyxis, Ghostty, Kitty, Alacritty, WezTerm, etc.).
+
+## Why "Argus Agenticus"?
+
+**Argus Panoptes** (Ancient Greek: Ἄργος Πανόπτης — "all-seeing") was a hundred-eyed giant from Greek mythology, appointed by Hera to watch over Io. Some of his eyes were always awake while the others slept — the perfect guardian who never misses a thing. **Agenticus** — because he watches not nymphs, but AI agents; the Latin suffix *-icus* means "related to / belonging to."
+
+Thus was born **Argus Agenticus** — the watcher of agents.
 
 ## Architecture
 
