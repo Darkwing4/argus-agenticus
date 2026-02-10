@@ -11,6 +11,8 @@ argus-agenticus = { path = ".", features = ["test-helpers"] }
 
 [dependencies]
 tokio = { version = "1.49", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+bytes = "1"
 serde = { version = "1.0.228", features = ["derive", "rc"] }
 serde_json = "1.0.149"
 tracing = "0.1.44"

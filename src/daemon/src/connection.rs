@@ -1,10 +1,12 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use bytes::BytesMut;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::UnixStream;
 use tokio::sync::{broadcast, mpsc, Mutex, Notify};
+use tokio_util::codec::{Decoder, LinesCodec, LinesCodecError};
 use tracing::warn;
 
 use crate::handler;
@@ -30,7 +32,6 @@ impl Connection {
 
     pub async fn run(&self, stream: UnixStream) -> std::io::Result<()> {
         let (reader, writer) = stream.into_split();
-        let reader = BufReader::new(reader);
         let is_extension = AtomicBool::new(false);
         let (reply_tx, reply_rx) = mpsc::channel(16);
         let broadcast_rx = self.broadcast_tx.subscribe();
@@ -45,31 +46,37 @@ impl Connection {
 
     async fn read_loop(
         &self,
-        mut reader: BufReader<OwnedReadHalf>,
+        mut reader: OwnedReadHalf,
         reply_tx: &mpsc::Sender<OutgoingMessage>,
         is_extension: &AtomicBool,
     ) -> std::io::Result<()> {
-        let mut line = String::new();
+        let mut codec = LinesCodec::new_with_max_length(MAX_LINE_LENGTH);
+        let mut buf = BytesMut::with_capacity(4096);
+
         loop {
-            line.clear();
-            if reader.read_line(&mut line).await? == 0 {
-                break;
-            }
-            if line.len() > MAX_LINE_LENGTH {
-                warn!("Line too long: {} bytes, dropping", line.len());
-                line = String::new();
-                continue;
-            }
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
-            match serde_json::from_str::<IncomingMessage>(trimmed) {
-                Ok(msg) => {
-                    let effects = handler::process(msg, &self.state).await;
-                    self.apply(effects, reply_tx, is_extension).await;
+            match codec.decode(&mut buf) {
+                Ok(Some(line)) => {
+                    let trimmed = line.trim();
+                    if !trimmed.is_empty() {
+                        match serde_json::from_str::<IncomingMessage>(trimmed) {
+                            Ok(msg) => {
+                                let effects = handler::process(msg, &self.state).await;
+                                self.apply(effects, reply_tx, is_extension).await;
+                            }
+                            Err(e) => warn!("Invalid JSON: {} - {}", trimmed, e),
+                        }
+                    }
+                    continue;
                 }
-                Err(e) => warn!("Invalid JSON: {} - {}", trimmed, e),
+                Ok(None) => {}
+                Err(LinesCodecError::MaxLineLengthExceeded) => {
+                    warn!("Line too long, dropping");
+                    continue;
+                }
+                Err(LinesCodecError::Io(e)) => return Err(e),
+            }
+            if reader.read_buf(&mut buf).await? == 0 {
+                break;
             }
         }
         Ok(())
