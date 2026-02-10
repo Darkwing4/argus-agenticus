@@ -58,12 +58,12 @@ cd argus-agenticus
 
 ### Requirements
 
-- [Rust](https://rustup.rs/) toolchain (`cargo`)
 - `jq`
 - `socat` or `netcat`
+- `curl` (for downloading pre-built binary) or [Rust](https://rustup.rs/) toolchain (to build from source)
 - GNOME 49+ with Wayland (for the desktop extension)
 
-The installer will build the daemon, configure agent hooks for Claude Code (and Cursor if installed), set up the systemd service, and install the GNOME extension.
+The installer downloads a pre-built binary from GitHub Releases (x86_64 / aarch64). If that fails, it falls back to building from source with `cargo`. It also configures agent hooks for Claude Code (and Cursor if installed), sets up the systemd service, and installs the GNOME extension.
 
 ## Supported Agents
 

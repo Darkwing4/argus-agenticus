@@ -2,6 +2,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/darkwing4/argus-agenticus.git"
+RELEASES_URL="https://github.com/Darkwing4/argus-agenticus/releases/latest/download"
 HOOK_CMD="bash ~/.claude/hooks/events-to-socket.sh"
 
 info()  { printf '\033[1;34m==> %s\033[0m\n' "$*"; }
@@ -16,7 +17,6 @@ require_dep() {
     check_dep "$1" || err "$1 is required but not found. Please install it first."
 }
 
-require_dep cargo
 require_dep jq
 
 if ! check_dep socat && ! check_dep nc; then
@@ -24,24 +24,61 @@ if ! check_dep socat && ! check_dep nc; then
     warn "Install socat: sudo apt install socat  (or your package manager equivalent)"
 fi
 
+ARCH=$(uname -m)
+case "$ARCH" in
+    x86_64)  BINARY_NAME="argus-agenticus-linux-x86_64" ;;
+    aarch64) BINARY_NAME="argus-agenticus-linux-aarch64" ;;
+    *)       BINARY_NAME="" ;;
+esac
+
 REPO_DIR=""
 CLONED=false
+BUILT_FROM_SOURCE=false
 
-if [ -f "src/daemon/Cargo.toml" ]; then
-    REPO_DIR="$(pwd)"
-else
-    require_dep git
-    info "Cloning repository..."
-    REPO_DIR="$(mktemp -d)/argus-agenticus"
-    git clone --depth 1 "$REPO_URL" "$REPO_DIR"
-    CLONED=true
+mkdir -p ~/.local/bin
+
+if [ -n "$BINARY_NAME" ] && check_dep curl; then
+    info "Downloading pre-built binary ($ARCH)..."
+    if curl -fsSL "$RELEASES_URL/$BINARY_NAME" -o ~/.local/bin/argus-agenticus; then
+        chmod +x ~/.local/bin/argus-agenticus
+        info "Binary installed from GitHub Releases."
+    else
+        warn "Download failed, falling back to build from source."
+        BINARY_NAME=""
+    fi
 fi
 
-info "Building daemon..."
-cargo build --release --manifest-path "$REPO_DIR/src/daemon/Cargo.toml"
-mkdir -p ~/.local/bin
-cp "$REPO_DIR/src/daemon/target/release/argus-agenticus" ~/.local/bin/
-chmod +x ~/.local/bin/argus-agenticus
+if [ -z "$BINARY_NAME" ] || [ ! -x ~/.local/bin/argus-agenticus ]; then
+    require_dep cargo
+
+    if [ -f "src/daemon/Cargo.toml" ]; then
+        REPO_DIR="$(pwd)"
+    else
+        require_dep git
+        info "Cloning repository..."
+        REPO_DIR="$(mktemp -d)/argus-agenticus"
+        git clone --depth 1 "$REPO_URL" "$REPO_DIR"
+        CLONED=true
+    fi
+
+    info "Building daemon from source..."
+    cargo build --release --manifest-path "$REPO_DIR/src/daemon/Cargo.toml"
+    cp "$REPO_DIR/src/daemon/target/release/argus-agenticus" ~/.local/bin/
+    chmod +x ~/.local/bin/argus-agenticus
+    BUILT_FROM_SOURCE=true
+fi
+
+if [ -z "$REPO_DIR" ]; then
+    if [ -f "src/hooks/events-to-socket.sh" ]; then
+        REPO_DIR="$(pwd)"
+    else
+        require_dep git
+        info "Cloning repository for config files..."
+        REPO_DIR="$(mktemp -d)/argus-agenticus"
+        git clone --depth 1 "$REPO_URL" "$REPO_DIR"
+        CLONED=true
+    fi
+fi
 
 info "Installing hook script..."
 mkdir -p ~/.claude/hooks
