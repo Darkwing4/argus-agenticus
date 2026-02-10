@@ -8,8 +8,7 @@ Monitor and manage multiple AI coding agents from your desktop panel.
 ![Claude Code](https://img.shields.io/badge/Claude_Code-supported-green)
 ![Cursor](https://img.shields.io/badge/Cursor_CLI-supported-green)
 
-<!-- TODO: add demo GIF here -->
-<!-- ![demo](assets/demo.gif) -->
+https://github.com/user-attachments/assets/a2057241-5a37-4e31-9132-1449730b53d7
 
 ## The Problem
 
