@@ -55,6 +55,15 @@ class MockDaemon:
         self._writer.write(data.encode())
         await self._writer.drain()
 
+    async def disconnect_client(self):
+        if self._writer:
+            self._writer.close()
+            await self._writer.wait_closed()
+        self._reader = None
+        self._writer = None
+        self._connected.clear()
+        self.messages.clear()
+
     async def stop(self):
         if self._writer:
             self._writer.close()
