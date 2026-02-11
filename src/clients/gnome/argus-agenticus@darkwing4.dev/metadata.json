@@ -1,7 +1,7 @@
 {
   "name": "Argus Agenticus",
   "description": "AI agent monitoring bar",
-  "uuid": "argus-agenticus@ivan.dev",
+  "uuid": "argus-agenticus@darkwing4.dev",
   "shell-version": ["49"],
   "settings-schema": "org.gnome.shell.extensions.argus-agenticus",
   "version": 1,

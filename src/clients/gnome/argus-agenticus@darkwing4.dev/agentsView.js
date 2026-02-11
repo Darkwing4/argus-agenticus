@@ -52,7 +52,7 @@ class AgentsView extends St.BoxLayout {
 
         this._idleMonitor.start();
         this._windowTracker.start();
-        this._daemon.connect();
+        this._daemon.start();
     }
 
     _setupSettings() {
@@ -80,19 +80,27 @@ class AgentsView extends St.BoxLayout {
     }
 
     _wireDaemon() {
-        this._daemon.onMessage = (line) => this._handleMessage(line);
+        this._daemonSignals = [];
 
-        this._daemon.onConnected = () => {
-            this._focusManager.resetWorkspaceCache();
-            this._onFocusWindowChanged();
-            this._focusManager.sendAllWorkspaces((msg) => this._daemon.send(msg));
-            this._sendAutoFocusConfig();
-        };
+        this._daemonSignals.push(
+            this._daemon.connect('message-received', (_self, line) => this._handleMessage(line))
+        );
 
-        this._daemon.onDisconnected = () => {
-            this._agents = [];
-            this._updateDots();
-        };
+        this._daemonSignals.push(
+            this._daemon.connect('connected', () => {
+                this._focusManager.resetWorkspaceCache();
+                this._onFocusWindowChanged();
+                this._focusManager.sendAllWorkspaces((msg) => this._daemon.send(msg));
+                this._sendAutoFocusConfig();
+            })
+        );
+
+        this._daemonSignals.push(
+            this._daemon.connect('disconnected', () => {
+                this._agents = [];
+                this._updateDots();
+            })
+        );
     }
 
     _wireWindowTracker() {
@@ -176,9 +184,12 @@ class AgentsView extends St.BoxLayout {
             this._settingsChangedId = null;
         }
 
+        for (const id of this._daemonSignals)
+            this._daemon.disconnect(id);
+
         this._idleMonitor.stop();
         this._windowTracker.stop();
-        this._daemon.disconnect();
+        this._daemon.stop();
         this._focusManager.destroy();
         this._renderer.destroy();
 

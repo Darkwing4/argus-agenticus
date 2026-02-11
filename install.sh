@@ -146,8 +146,8 @@ systemctl --user enable --now argus-agenticus
 GNOME_INSTALLED=false
 if echo "${XDG_CURRENT_DESKTOP:-}" | grep -qi gnome || check_dep gnome-shell; then
     info "Installing GNOME extension..."
-    EXT_DIR="$HOME/.local/share/gnome-shell/extensions/argus-agenticus@ivan.dev"
-    EXT_SRC="$REPO_DIR/src/clients/gnome/argus-agenticus@ivan.dev"
+    EXT_DIR="$HOME/.local/share/gnome-shell/extensions/argus-agenticus@darkwing4.dev"
+    EXT_SRC="$REPO_DIR/src/clients/gnome/argus-agenticus@darkwing4.dev"
 
     if [ "$CLONED" = true ]; then
         rm -rf "$EXT_DIR"
@@ -161,7 +161,7 @@ if echo "${XDG_CURRENT_DESKTOP:-}" | grep -qi gnome || check_dep gnome-shell; th
         ln -s "$(realpath "$EXT_SRC")" "$EXT_DIR"
     fi
 
-    gnome-extensions enable argus-agenticus@ivan.dev 2>/dev/null || true
+    gnome-extensions enable argus-agenticus@darkwing4.dev 2>/dev/null || true
     GNOME_INSTALLED=true
 fi
 

@@ -1,22 +1,26 @@
+import GObject from 'gi://GObject';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import { RECONNECT_DELAY } from './constants.js';
 
-export class DaemonClient {
+export const DaemonClient = GObject.registerClass({
+    Signals: {
+        'message-received': { param_types: [GObject.TYPE_STRING] },
+        'connected': {},
+        'disconnected': {},
+    },
+}, class DaemonClient extends GObject.Object {
 
-    constructor(cancellable) {
+    _init(cancellable) {
+        super._init();
         this._cancellable = cancellable;
         this._connection = null;
         this._inputStream = null;
         this._outputStream = null;
         this._reconnectTimeout = null;
-
-        this.onMessage = null;
-        this.onConnected = null;
-        this.onDisconnected = null;
     }
 
-    connect() {
+    start() {
         if (this._cancellable.is_cancelled())
             return;
 
@@ -33,7 +37,7 @@ export class DaemonClient {
                 });
                 this._outputStream = this._connection.get_output_stream();
 
-                this.onConnected?.();
+                this.emit('connected');
                 this._readLoop();
             } catch (e) {
                 if (!this._cancellable.is_cancelled())
@@ -55,7 +59,7 @@ export class DaemonClient {
         }
     }
 
-    disconnect() {
+    stop() {
         if (this._reconnectTimeout !== null) {
             GLib.source_remove(this._reconnectTimeout);
             this._reconnectTimeout = null;
@@ -80,7 +84,7 @@ export class DaemonClient {
 
         this._reconnectTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, RECONNECT_DELAY, () => {
             this._reconnectTimeout = null;
-            this.connect();
+            this.start();
             return GLib.SOURCE_REMOVE;
         });
     }
@@ -98,7 +102,7 @@ export class DaemonClient {
                     return;
                 }
 
-                this.onMessage?.(line);
+                this.emit('message-received', line);
                 this._readLoop();
             } catch (e) {
                 if (!this._cancellable.is_cancelled())
@@ -111,7 +115,7 @@ export class DaemonClient {
         this._connection = null;
         this._inputStream = null;
         this._outputStream = null;
-        this.onDisconnected?.();
+        this.emit('disconnected');
         this._scheduleReconnect();
     }
-}
+});
