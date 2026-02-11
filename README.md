@@ -12,12 +12,10 @@ https://github.com/user-attachments/assets/a2057241-5a37-4e31-9132-1449730b53d7
 
 ## The Problem
 
-Running multiple AI agents across terminals, workspaces, and monitors hits a hard limit: **developer attention**.
-
 > *"With one agent, I used to wait for Claude. With two agents I still waited for Claude, but not as long. With three agents Claude is waiting for me. I am the bottleneck. And the bottleneck is all planning."*
 > — [Robert C. Martin](https://x.com/unclebobmartin/status/2016544529826926618)
 
-Planning isn't the only bottleneck — there's also the **attention limit**. 9 terminals, 6 workspaces, one agent has been waiting for permission approval for 8 hours and you didn't even notice. This creates the **"forgotten agent" problem**.
+But planning isn't the only bottleneck. Human working memory holds [about 4 objects at once](https://en.wikipedia.org/wiki/Working_memory#Capacity) — and every extra terminal, workspace, or monitor competes for that capacity. 9 terminals, 6 workspaces, one agent waiting for permission approval for 8 hours — and you didn't even notice. This is the **"forgotten agent" problem**.
 
 **Argus Agenticus solves it.**
 
