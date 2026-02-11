@@ -33,7 +33,9 @@ Every running cli-agent gets a colored indicator in your desktop panel:
 ## Features
 
 - **Click an indicator** — focus the agent's window, even across workspaces
-- **Super+F2** — cycle to the next agent, sorted by priority: 🔴 → 🔵 → 🟢 → 🟡
+- **Easy navigation**
+  - Hover over an indicator to see the agent's name, project, and tab number in multiplexer (if used)
+  - **Super+F2** — cycle to the next agent, sorted by priority: 🔴 → 🔵 → 🟢 → 🟡
 - **Auto-focus on 🔴** — Argus automatically switches your screen (when idle) to each agent that needs attention, and returns you back when no 🔴 agents remain
 - **Visual grouping** — agents are grouped by physical monitors and workspaces
 
