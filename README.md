@@ -90,7 +90,11 @@ Other multiplexers will be supported in the future.
 
 ### Terminals
 
-Any terminal emulator with a WM Class is supported (Ptyxis, Ghostty, Kitty, Alacritty, WezTerm, etc.).
+Most popular terminals are recognized out of the box (Ptyxis, Alacritty, Kitty, WezTerm, Foot, GNOME Terminal, Tilix, BlackBox). To add or change the list:
+
+```bash
+dconf write /org/gnome/shell/extensions/argus-agenticus/terminal-wm-classes "['Ptyxis', 'Ghostty']"
+```
 
 ## Why "Argus Agenticus"?
 
