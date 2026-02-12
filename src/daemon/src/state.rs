@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use crate::protocol::{AgentInfo, AgentState};
 
-const ENDED_HIDE_DELAY: Duration = Duration::from_secs(30);
+const ENDED_HIDE_DELAY: Duration = Duration::from_secs(10);
 const FOCUS_PRIORITIES: &[AgentState] = &[
     AgentState::Awaiting,
     AgentState::Completed,
