@@ -7,6 +7,7 @@ import { WindowTracker } from './windowTracker.js';
 import { FocusManager } from './focusManager.js';
 import { Renderer } from './renderer.js';
 import { IdleMonitor } from './idleMonitor.js';
+import { updateTerminalWmClasses } from './constants.js';
 
 export const AgentsView = GObject.registerClass(
 class AgentsView extends St.BoxLayout {
@@ -56,12 +57,17 @@ class AgentsView extends St.BoxLayout {
     }
 
     _setupSettings() {
+        updateTerminalWmClasses(this._settings.get_strv('terminal-wm-classes'));
         this._autoFocusEnabled = this._settings.get_boolean('auto-focus-enabled');
         this._focusDelayMs = this._settings.get_int('focus-delay-ms');
         this._inputIdleThresholdMs = this._settings.get_int('input-idle-threshold-ms');
 
         this._settingsChangedId = this._settings.connect('changed', (settings, key) => {
             switch (key) {
+                case 'terminal-wm-classes':
+                    updateTerminalWmClasses(settings.get_strv(key));
+                    this._windowTracker.rescan();
+                    break;
                 case 'auto-focus-enabled':
                     this._autoFocusEnabled = settings.get_boolean(key);
                     this._renderer.updateAutoFocusButtonStyle(this._autoFocusEnabled);

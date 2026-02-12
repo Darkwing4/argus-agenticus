@@ -103,6 +103,11 @@ export class WindowTracker {
         return [null, null];
     }
 
+    rescan() {
+        for (const actor of global.get_window_actors())
+            this._trackWindow(actor.meta_window);
+    }
+
     _trackWindow(win) {
         const wm = win.get_wm_class() || '';
         if (!wm) {
