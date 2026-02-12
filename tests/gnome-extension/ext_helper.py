@@ -1,3 +1,5 @@
+import asyncio
+
 EXT_UUID = "argus-agenticus@darkwing4.dev"
 
 PREAMBLE = (
@@ -99,3 +101,47 @@ class ExtView:
             return val == "alive"
         except Exception:
             return False
+
+    async def wait_dot_count(self, expected, timeout=2.0):
+        return await self._poll(self.dot_count, expected, timeout)
+
+    async def wait_visible(self, expected, timeout=2.0):
+        return await self._poll(self.is_visible, expected, timeout)
+
+    async def wait_group_count(self, expected, timeout=2.0):
+        return await self._poll(self.group_count, expected, timeout)
+
+    async def wait_dot_class(self, session, cls, timeout=2.0):
+        async def check():
+            classes = await self.dot_style_classes(session)
+            return cls in classes
+        return await self._poll(check, True, timeout)
+
+    async def wait_no_dot_class(self, session, cls, timeout=2.0):
+        async def check():
+            classes = await self.dot_style_classes(session)
+            return cls not in classes
+        return await self._poll(check, True, timeout)
+
+    async def wait_tooltip(self, expected, timeout=2.0):
+        return await self._poll(self.tooltip_text, expected, timeout)
+
+    async def wait_auto_focus_class(self, cls, expected, timeout=2.0):
+        async def check():
+            return await self.auto_focus_button_has_class(cls)
+        return await self._poll(check, expected, timeout)
+
+    async def wait_original_workspace(self, expected, timeout=2.0):
+        return await self._poll(self.original_workspace, expected, timeout)
+
+    async def _poll(self, fn, expected, timeout, interval=0.1):
+        deadline = asyncio.get_event_loop().time() + timeout
+        last = None
+        while asyncio.get_event_loop().time() < deadline:
+            last = await fn()
+            if last == expected:
+                return last
+            await asyncio.sleep(interval)
+        last = await fn()
+        assert last == expected, f"poll timeout: expected {expected!r}, got {last!r}"
+        return last

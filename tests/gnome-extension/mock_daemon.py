@@ -55,6 +55,18 @@ class MockDaemon:
         self._writer.write(data.encode())
         await self._writer.drain()
 
+    async def render(self, agents):
+        await self.send({"type": "render", "agents": agents})
+
+    async def focus(self, session):
+        await self.send({"type": "focus", "session": session})
+
+    async def auto_focus(self, session):
+        await self.send({"type": "auto_focus", "session": session})
+
+    async def return_workspace(self):
+        await self.send({"type": "return_workspace"})
+
     async def disconnect_client(self):
         if self._writer:
             self._writer.close()

@@ -1,6 +1,3 @@
-import asyncio
-
-
 async def test_idle_detected(ext, gsettings):
     await gsettings("input-idle-threshold-ms", 200)
     msg = await ext.recv_until("idle_status", timeout=5)

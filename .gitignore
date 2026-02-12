@@ -3,3 +3,4 @@ test-reports/
 .idea/
 worktree/
 .venv/
+__pycache__/

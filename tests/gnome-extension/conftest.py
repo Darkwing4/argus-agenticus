@@ -17,6 +17,17 @@ DBUS_STARTUP_TIMEOUT = 5
 _test_results = []
 
 
+def agent(session="proj#1", state="started", group="proj",
+          agent_type="claude", focused=False):
+    return {
+        "session": session,
+        "state": state,
+        "focused": focused,
+        "group": group,
+        "agent_type": agent_type,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Session-scoped fixtures (gnome-shell starts once per test run)
 # ---------------------------------------------------------------------------
@@ -114,7 +125,7 @@ async def shell_eval(dbus_session, gnome_shell):
 
 
 @pytest_asyncio.fixture(scope="session")
-async def ext_view(shell_eval):
+async def view(shell_eval):
     return ExtView(shell_eval)
 
 
@@ -123,11 +134,11 @@ async def ext_view(shell_eval):
 # ---------------------------------------------------------------------------
 
 @pytest_asyncio.fixture
-async def ext(mock_daemon, gnome_shell, ext_view):
+async def ext(mock_daemon, gnome_shell, view):
     mock_daemon.messages.clear()
     yield mock_daemon
     try:
-        await mock_daemon.send({"type": "render", "agents": []})
+        await mock_daemon.render([])
     except Exception:
         pass
     await asyncio.sleep(0.1)
@@ -172,7 +183,6 @@ async def gsettings(dbus_session, gnome_shell):
             env=env,
         )
         await proc.wait()
-        await asyncio.sleep(0.2)
 
     return _set
 
