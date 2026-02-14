@@ -130,6 +130,12 @@ impl StateManager {
         changed
     }
 
+    pub fn remove_session(&mut self, session: &str) -> bool {
+        self.awaiting_queue.retain(|s| s != session);
+        self.workspaces.remove(session);
+        self.sessions.remove(session).is_some()
+    }
+
     pub fn cleanup_ended(&mut self) -> bool {
         let now = Instant::now();
         let before = self.sessions.len();

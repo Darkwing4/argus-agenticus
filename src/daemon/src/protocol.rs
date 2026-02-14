@@ -45,6 +45,9 @@ pub enum IncomingMessage {
     },
     ClearAgents,
     MarkAllStarted,
+    WindowClosed {
+        session: String,
+    },
 }
 
 fn default_agent_type() -> String {

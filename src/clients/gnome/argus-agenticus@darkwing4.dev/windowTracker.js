@@ -15,6 +15,7 @@ export class WindowTracker {
         this.onWindowTracked = null;
         this.onMonitorChanged = null;
         this.onWorkspaceChanged = null;
+        this.onWindowUnmanaged = null;
     }
 
     start() {
@@ -146,6 +147,7 @@ export class WindowTracker {
             if (session) this._sessionToWindow.delete(session);
             this._windowToSession.delete(win);
             this._windowSignals.delete(win);
+            if (session) this.onWindowUnmanaged?.(session);
         });
 
         this._windowSignals.set(win, [wsId, titleId, unmanagedId]);

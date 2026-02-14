@@ -85,5 +85,12 @@ pub async fn process(
             s.set_auto_focus_config(enabled, focus_delay_ms);
             Effects { reply: None, auto_focus: AutoFocusEvent::Trigger, mark_extension: true, broadcast_render: false }
         }
+
+        IncomingMessage::WindowClosed { session } => {
+            debug!("Window closed: {}", session);
+            let mut s = state.lock().await;
+            s.remove_session(&session);
+            Effects { reply: None, auto_focus: AutoFocusEvent::None, mark_extension: false, broadcast_render: true }
+        }
     }
 }
