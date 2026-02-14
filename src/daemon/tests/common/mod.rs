@@ -59,6 +59,10 @@ pub fn msg_auto_focus_config(enabled: bool, delay_ms: u64) -> IncomingMessage {
     }
 }
 
+pub fn msg_window_closed(session: &str) -> IncomingMessage {
+    IncomingMessage::WindowClosed { session: to_s(session) }
+}
+
 pub fn should_broadcast(fx: &Effects) {
     assert!(fx.broadcast_render, "expected broadcast_render=true");
 }

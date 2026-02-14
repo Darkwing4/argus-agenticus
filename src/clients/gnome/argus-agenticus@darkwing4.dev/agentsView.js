@@ -242,6 +242,10 @@ class AgentsView extends St.BoxLayout {
                 (msg) => this._daemon.send(msg)
             );
         };
+
+        this._windowTracker.onWindowUnmanaged = (session) => {
+            this._daemon.send({ type: 'window_closed', session });
+        };
     }
 
     _wireIdleMonitor() {

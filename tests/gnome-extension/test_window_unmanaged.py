@@ -39,10 +39,5 @@ async def test_unmanaged_window_notifies_daemon(ext, view):
     )
     await view.raw(js)
 
-    await asyncio.sleep(0.5)
-
-    unmanaged_msgs = [m for m in ext.messages if m.get("session") == "proj#1"]
-    assert len(unmanaged_msgs) > 0, (
-        f"daemon should receive a message after window unmanaged, "
-        f"got messages: {ext.messages}"
-    )
+    msg = await ext.recv_until("window_closed", timeout=2)
+    assert msg["session"] == "proj#1"

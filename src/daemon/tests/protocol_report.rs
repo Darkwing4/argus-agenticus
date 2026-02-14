@@ -194,6 +194,18 @@ fn all_agent_states() {
 }
 
 #[test]
+fn deserialize_window_closed() {
+    let json = r#"{"type":"window_closed","session":"proj#1"}"#;
+    let msg: IncomingMessage = serde_json::from_str(json).unwrap();
+    match msg {
+        IncomingMessage::WindowClosed { session } => {
+            assert_eq!(session, "proj#1");
+        }
+        other => panic!("expected WindowClosed, got {other:?}"),
+    }
+}
+
+#[test]
 fn invalid_json_error() {
     let result = serde_json::from_str::<IncomingMessage>("not json at all");
     assert!(result.is_err());
