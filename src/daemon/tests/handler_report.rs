@@ -161,6 +161,36 @@ async fn mark_all_started_broadcasts() {
 }
 
 #[tokio::test]
+async fn window_closed_removes_session() {
+    let state = fresh_state();
+    handler::process(msg_state("p#1", AgentState::Started), &state).await;
+    let fx = handler::process(msg_window_closed("p#1"), &state).await;
+    should_broadcast(&fx);
+    should_have_no_reply(&fx);
+    should_no_auto_focus(&fx);
+    should_not_mark_extension(&fx);
+    let data = state.lock().await.get_render_data();
+    assert!(data.is_empty(), "session should be removed, got {data:?}");
+}
+
+#[tokio::test]
+async fn window_closed_clears_awaiting() {
+    let state = fresh_state();
+    handler::process(msg_state("p#1", AgentState::Awaiting), &state).await;
+    handler::process(msg_window_closed("p#1"), &state).await;
+    let mut s = state.lock().await;
+    assert!(s.next_awaiting().is_none(), "awaiting queue should be empty");
+}
+
+#[tokio::test]
+async fn window_closed_unknown_session() {
+    let state = fresh_state();
+    let fx = handler::process(msg_window_closed("nonexistent#1"), &state).await;
+    should_broadcast(&fx);
+    should_have_no_reply(&fx);
+}
+
+#[tokio::test]
 async fn scenario_full_lifecycle() {
     let state = fresh_state();
 
