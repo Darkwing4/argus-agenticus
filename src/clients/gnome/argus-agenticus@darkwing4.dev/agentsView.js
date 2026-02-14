@@ -2,6 +2,8 @@ import GObject from 'gi://GObject';
 import St from 'gi://St';
 import Gio from 'gi://Gio';
 import Clutter from 'gi://Clutter';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { DaemonClient } from './daemonClient.js';
 import { WindowTracker } from './windowTracker.js';
 import { FocusManager } from './focusManager.js';
@@ -46,6 +48,19 @@ class AgentsView extends St.BoxLayout {
         this._renderer.updateAutoFocusButtonStyle(this._autoFocusEnabled);
         this.add_child(autoFocusButton);
         this.add_child(groupsBox);
+
+        this._menu = new PopupMenu.PopupMenu(logo, 0.0, St.Side.TOP);
+        Main.uiGroup.add_child(this._menu.actor);
+        this._menu.actor.hide();
+
+        this._menu.addAction('Clear agents list', () => {
+            this._daemon.send({ type: 'clear_agents' });
+        });
+        this._menu.addAction('Mark all awaiting as started', () => {
+            this._daemon.send({ type: 'mark_all_started' });
+        });
+
+        logo.connect('clicked', () => this._menu.toggle());
 
         this._wireDaemon();
         this._wireWindowTracker();
@@ -196,6 +211,11 @@ class AgentsView extends St.BoxLayout {
         this._idleMonitor.stop();
         this._windowTracker.stop();
         this._daemon.stop();
+        if (this._menu) {
+            this._menu.destroy();
+            this._menu = null;
+        }
+
         this._focusManager.destroy();
         this._renderer.destroy();
 
