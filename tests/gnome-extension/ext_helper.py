@@ -131,6 +131,16 @@ class ExtView:
             return await self.auto_focus_button_has_class(cls)
         return await self._poll(check, expected, timeout)
 
+    async def clear_agents(self):
+        await self._eval(_wrap(
+            "_view._daemon.send({type: 'clear_agents'}); return '';"
+        ))
+
+    async def mark_all_started(self):
+        await self._eval(_wrap(
+            "_view._daemon.send({type: 'mark_all_started'}); return '';"
+        ))
+
     async def wait_original_workspace(self, expected, timeout=2.0):
         return await self._poll(self.original_workspace, expected, timeout)
 

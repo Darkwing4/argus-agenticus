@@ -1,7 +1,7 @@
 mod common;
 
 use argus_agenticus::handler;
-use argus_agenticus::protocol::AgentState;
+use argus_agenticus::protocol::{AgentState, IncomingMessage};
 
 use common::*;
 
@@ -122,6 +122,42 @@ async fn auto_focus_config_triggers() {
     should_trigger(&fx);
     should_mark_extension(&fx);
     should_not_broadcast(&fx);
+}
+
+#[tokio::test]
+async fn clear_agents_broadcasts() {
+    let state = fresh_state();
+    handler::process(msg_state("p#1", AgentState::Started), &state).await;
+    handler::process(msg_state("p#2", AgentState::Awaiting), &state).await;
+
+    let fx = handler::process(IncomingMessage::ClearAgents, &state).await;
+    should_broadcast(&fx);
+    should_have_no_reply(&fx);
+
+    let data = state.lock().await.get_render_data();
+    assert!(data.is_empty());
+}
+
+#[tokio::test]
+async fn mark_all_started_broadcasts() {
+    let state = fresh_state();
+    handler::process(msg_state("p#1", AgentState::Awaiting), &state).await;
+    handler::process(msg_state("p#2", AgentState::Awaiting), &state).await;
+    handler::process(msg_state("p#3", AgentState::Working), &state).await;
+
+    let fx = handler::process(IncomingMessage::MarkAllStarted, &state).await;
+    should_broadcast(&fx);
+    should_have_no_reply(&fx);
+
+    let data = state.lock().await.get_render_data();
+    for a in &data {
+        if a.session == "p#1" || a.session == "p#2" {
+            assert_eq!(a.state, AgentState::Started);
+        }
+        if a.session == "p#3" {
+            assert_eq!(a.state, AgentState::Working);
+        }
+    }
 }
 
 #[tokio::test]

@@ -65,6 +65,20 @@ pub async fn process(
             Effects { reply: None, auto_focus: AutoFocusEvent::Trigger, mark_extension: true, broadcast_render: false }
         }
 
+        IncomingMessage::ClearAgents => {
+            debug!("Clear agents");
+            let mut s = state.lock().await;
+            s.clear_all();
+            Effects { reply: None, auto_focus: AutoFocusEvent::None, mark_extension: false, broadcast_render: true }
+        }
+
+        IncomingMessage::MarkAllStarted => {
+            debug!("Mark all started");
+            let mut s = state.lock().await;
+            s.mark_all_started();
+            Effects { reply: None, auto_focus: AutoFocusEvent::None, mark_extension: false, broadcast_render: true }
+        }
+
         IncomingMessage::AutoFocusConfig { enabled, focus_delay_ms } => {
             debug!("Auto-focus config: enabled={}, delay={}ms", enabled, focus_delay_ms);
             let mut s = state.lock().await;
