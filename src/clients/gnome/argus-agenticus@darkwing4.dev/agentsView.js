@@ -14,7 +14,7 @@ import { updateTerminalWmClasses } from './constants.js';
 export const AgentsView = GObject.registerClass(
 class AgentsView extends St.BoxLayout {
 
-    _init(settings, extensionPath) {
+    _init(settings, extensionPath, version) {
         super._init({
             style_class: 'panel-status-indicators-box',
             reactive: false,
@@ -49,18 +49,7 @@ class AgentsView extends St.BoxLayout {
         this.add_child(autoFocusButton);
         this.add_child(groupsBox);
 
-        this._menu = new PopupMenu.PopupMenu(logo, 0.0, St.Side.TOP);
-        Main.uiGroup.add_child(this._menu.actor);
-        this._menu.actor.hide();
-
-        this._menu.addAction('Clear agents list', () => {
-            this._daemon.send({ type: 'clear_agents' });
-        });
-        this._menu.addAction('Mark all awaiting as started', () => {
-            this._daemon.send({ type: 'mark_all_started' });
-        });
-
-        logo.connect('clicked', () => this._menu.toggle());
+        this._buildMenu(logo, version);
 
         this._wireDaemon();
         this._wireWindowTracker();
@@ -71,11 +60,104 @@ class AgentsView extends St.BoxLayout {
         this._daemon.start();
     }
 
+    _buildMenu(logo, version) {
+        this._menu = new PopupMenu.PopupMenu(logo, 0.0, St.Side.TOP);
+        Main.uiGroup.add_child(this._menu.actor);
+        this._menu.actor.hide();
+
+        this._menu.addMenuItem(new PopupMenu.PopupMenuItem(
+            `Argus Agenticus v${version}`, { reactive: false }
+        ));
+
+        this._daemonStatusItem = new PopupMenu.PopupMenuItem(
+            'Daemon: disconnected', { reactive: false }
+        );
+        this._menu.addMenuItem(this._daemonStatusItem);
+
+        this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        this._menu.addAction('Clear agents list', () => {
+            this._daemon.send({ type: 'clear_agents' });
+        });
+        this._menu.addAction('Mark all awaiting as started', () => {
+            this._daemon.send({ type: 'mark_all_started' });
+        });
+
+        this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        this._showLabelsSwitch = new PopupMenu.PopupSwitchMenuItem(
+            'Show labels', this._showLabels
+        );
+        this._showLabelsSwitch.connect('toggled', (_item, state) => {
+            this._settings.set_boolean('show-labels', state);
+        });
+        this._menu.addMenuItem(this._showLabelsSwitch);
+
+        this._buildRadioSubMenu(
+            'Dot size',
+            [
+                { label: 'Small', value: 'small' },
+                { label: 'Medium', value: 'medium' },
+                { label: 'Large', value: 'large' },
+            ],
+            'dot-size'
+        );
+
+        this._buildRadioSubMenu(
+            'Position',
+            [
+                { label: 'Left', value: 'left' },
+                { label: 'Center', value: 'center' },
+                { label: 'Right', value: 'right' },
+            ],
+            'panel-position'
+        );
+
+        logo.connect('clicked', () => this._menu.toggle());
+    }
+
+    _buildRadioSubMenu(title, options, settingsKey) {
+        const subMenu = new PopupMenu.PopupSubMenuMenuItem(title);
+        const items = [];
+
+        for (const opt of options) {
+            const item = new PopupMenu.PopupMenuItem(opt.label);
+            item._settingsValue = opt.value;
+            item.connect('activate', () => {
+                this._settings.set_string(settingsKey, opt.value);
+            });
+            subMenu.menu.addMenuItem(item);
+            items.push(item);
+        }
+
+        this._menu.addMenuItem(subMenu);
+
+        if (!this._radioMenus)
+            this._radioMenus = {};
+        this._radioMenus[settingsKey] = items;
+
+        this._updateRadioOrnaments(settingsKey, this._settings.get_string(settingsKey));
+    }
+
+    _updateRadioOrnaments(settingsKey, currentValue) {
+        const items = this._radioMenus?.[settingsKey];
+        if (!items) return;
+        for (const item of items) {
+            item.setOrnament(
+                item._settingsValue === currentValue
+                    ? PopupMenu.Ornament.DOT
+                    : PopupMenu.Ornament.NONE
+            );
+        }
+    }
+
     _setupSettings() {
         updateTerminalWmClasses(this._settings.get_strv('terminal-wm-classes'));
         this._autoFocusEnabled = this._settings.get_boolean('auto-focus-enabled');
         this._focusDelayMs = this._settings.get_int('focus-delay-ms');
         this._inputIdleThresholdMs = this._settings.get_int('input-idle-threshold-ms');
+        this._dotSize = this._settings.get_string('dot-size');
+        this._showLabels = this._settings.get_boolean('show-labels');
 
         this._settingsChangedId = this._settings.connect('changed', (settings, key) => {
             switch (key) {
@@ -96,6 +178,20 @@ class AgentsView extends St.BoxLayout {
                     this._inputIdleThresholdMs = settings.get_int(key);
                     this._idleMonitor.updateThreshold(this._inputIdleThresholdMs);
                     break;
+                case 'dot-size':
+                    this._dotSize = settings.get_string(key);
+                    this._updateRadioOrnaments('dot-size', this._dotSize);
+                    this._updateDots();
+                    break;
+                case 'show-labels':
+                    this._showLabels = settings.get_boolean(key);
+                    if (this._showLabelsSwitch)
+                        this._showLabelsSwitch.setToggleState(this._showLabels);
+                    this._updateDots();
+                    break;
+                case 'panel-position':
+                    this._updateRadioOrnaments('panel-position', settings.get_string(key));
+                    break;
             }
         });
     }
@@ -109,6 +205,8 @@ class AgentsView extends St.BoxLayout {
 
         this._daemonSignals.push(
             this._daemon.connect('connected', () => {
+                if (this._daemonStatusItem)
+                    this._daemonStatusItem.label.text = 'Daemon: connected';
                 this._focusManager.resetWorkspaceCache();
                 this._onFocusWindowChanged();
                 this._focusManager.sendAllWorkspaces((msg) => this._daemon.send(msg));
@@ -118,6 +216,8 @@ class AgentsView extends St.BoxLayout {
 
         this._daemonSignals.push(
             this._daemon.connect('disconnected', () => {
+                if (this._daemonStatusItem)
+                    this._daemonStatusItem.label.text = 'Daemon: disconnected';
                 this._agents = [];
                 this._updateDots();
             })
@@ -189,6 +289,9 @@ class AgentsView extends St.BoxLayout {
     _updateDots() {
         const visible = this._renderer.updateDots(this._agents, {
             onDotClicked: (session) => this._daemon.send({ type: 'click', session }),
+        }, {
+            dotSize: this._dotSize,
+            showLabels: this._showLabels,
         });
         this.visible = visible;
     }

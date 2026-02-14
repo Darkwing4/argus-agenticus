@@ -20,6 +20,18 @@
       <range min="100" max="10000"/>
     </key>
 
+    <key type="s" name="panel-position">
+      <default>'left'</default>
+    </key>
+
+    <key type="s" name="dot-size">
+      <default>'medium'</default>
+    </key>
+
+    <key type="b" name="show-labels">
+      <default>false</default>
+    </key>
+
     <key type="as" name="terminal-wm-classes">
       <default><![CDATA[['Ptyxis', 'org.gnome.Ptyxis', 'Alacritty', 'kitty', 'foot', 'org.wezfurlong.wezterm', 'gnome-terminal-server', 'Tilix', 'com.raggesilver.BlackBox']]]></default>
     </key>

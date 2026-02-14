@@ -4,12 +4,15 @@ import Clutter from 'gi://Clutter';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { AGENT_TYPES, HOVER_SCALE, MARGIN_DIFFERENT_GROUP, CLICK_PADDING } from './constants.js';
 
+const DOT_SIZES = { small: 6, medium: 10, large: 14 };
+
 export class Renderer {
 
     constructor(extensionPath) {
         this._extensionPath = extensionPath;
         this._dotWidgets = new Map();
         this._groupContainers = new Map();
+        this._groupLabels = new Map();
         this._tooltip = null;
         this._logo = null;
         this._autoFocusButton = null;
@@ -21,8 +24,10 @@ export class Renderer {
         const file = Gio.File.new_for_path(this._extensionPath + '/logo.png');
         const scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
         const texture = St.TextureCache.get_default().load_file_async(file, -1, 14, scaleFactor, scaleFactor);
-        this._logo = new St.Bin({
+        this._logo = new St.Button({
             style_class: 'argus-logo',
+            reactive: true,
+            track_hover: true,
             y_align: Clutter.ActorAlign.CENTER,
             child: texture,
         });
@@ -50,7 +55,11 @@ export class Renderer {
         };
     }
 
-    updateDots(agents, callbacks) {
+    updateDots(agents, callbacks, options = {}) {
+        const { dotSize = 'medium', showLabels = false } = options;
+        const size = DOT_SIZES[dotSize] || DOT_SIZES.medium;
+        const radius = Math.round(size / 2);
+
         const activeKeys = new Set(agents.map(a => a.session));
         const activeGroups = new Set(agents.map(a => a.group));
 
@@ -68,6 +77,9 @@ export class Renderer {
                 this._groupsBox.remove_child(container);
                 container.destroy();
                 this._groupContainers.delete(groupId);
+                if (this._groupLabels.has(groupId)) {
+                    this._groupLabels.delete(groupId);
+                }
             }
         }
 
@@ -98,6 +110,26 @@ export class Renderer {
 
             container.style = groupIndex > 0 ? `margin-left: ${MARGIN_DIFFERENT_GROUP}px;` : '';
 
+            const groupName = groupAgents[0].session.split('#')[0];
+            let label = this._groupLabels.get(groupId);
+            if (showLabels) {
+                if (!label) {
+                    label = new St.Label({
+                        style_class: 'agent-group-label',
+                        y_align: Clutter.ActorAlign.CENTER,
+                    });
+                    this._groupLabels.set(groupId, label);
+                    container.insert_child_at_index(label, 0);
+                }
+                label.text = groupName;
+            } else if (label) {
+                container.remove_child(label);
+                label.destroy();
+                this._groupLabels.delete(groupId);
+            }
+
+            const dotOffset = showLabels && this._groupLabels.has(groupId) ? 1 : 0;
+
             for (let i = 0; i < groupAgents.length; i++) {
                 const agent = groupAgents[i];
                 let widgets = this._dotWidgets.get(agent.session);
@@ -110,12 +142,16 @@ export class Renderer {
                 this._setDotState(widgets.dot, agent.state);
                 this._setDotType(widgets.dot, agent.agent_type);
 
+                widgets.dot.width = size;
+                widgets.dot.height = size;
+                widgets.dot.style = `border-radius: ${radius}px;`;
+
                 if (widgets.button.get_parent() !== container) {
                     widgets.button.get_parent()?.remove_child(widgets.button);
                     container.add_child(widgets.button);
                 }
 
-                container.set_child_at_index(widgets.button, i);
+                container.set_child_at_index(widgets.button, i + dotOffset);
                 widgets.button.style = `padding: ${CLICK_PADDING}px;`;
             }
 
@@ -166,6 +202,7 @@ export class Renderer {
         this.hideTooltip();
         this._dotWidgets.clear();
         this._groupContainers.clear();
+        this._groupLabels.clear();
     }
 
     _createDot(agent, callbacks) {
