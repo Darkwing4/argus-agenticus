@@ -43,6 +43,8 @@ pub enum IncomingMessage {
         enabled: bool,
         focus_delay_ms: u64,
     },
+    ClearAgents,
+    MarkAllStarted,
 }
 
 fn default_agent_type() -> String {

@@ -178,6 +178,23 @@ impl StateManager {
         Some(self.awaiting_queue[0].clone())
     }
 
+    pub fn clear_all(&mut self) {
+        self.sessions.clear();
+        self.workspaces.clear();
+        self.awaiting_queue.clear();
+        self.focused_group = None;
+        self.last_focus_index = 0;
+    }
+
+    pub fn mark_all_started(&mut self) {
+        for info in self.sessions.values_mut() {
+            if info.state == AgentState::Awaiting {
+                info.state = AgentState::Started;
+            }
+        }
+        self.awaiting_queue.clear();
+    }
+
     pub fn get_render_data(&self) -> Vec<AgentInfo> {
         let mut keys: Vec<&String> = self.sessions.keys().collect();
         keys.sort_by(|a, b| {

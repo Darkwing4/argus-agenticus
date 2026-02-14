@@ -276,6 +276,54 @@ fn test_cleanup_preserves_other_workspaces() -> bool {
     true
 }
 
+fn test_clear_all() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("proj#1"), AgentState::Started, s("bash"), a("claude"));
+    sm.update_state(s("proj#2"), AgentState::Awaiting, s("bash"), a("claude"));
+    sm.update_state(s("other#1"), AgentState::Working, s("bash"), a("claude"));
+    sm.update_workspace("proj", 1, 0);
+    sm.update_workspace("other", 2, 0);
+
+    sm.clear_all();
+
+    let data = sm.get_render_data();
+    assert!(data.is_empty());
+    assert!(sm.next_awaiting().is_none());
+    true
+}
+
+fn test_mark_all_started() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("proj#1"), AgentState::Awaiting, s("bash"), a("claude"));
+    sm.update_state(s("proj#2"), AgentState::Awaiting, s("bash"), a("claude"));
+    sm.update_state(s("other#1"), AgentState::Working, s("bash"), a("claude"));
+    sm.update_state(s("done#1"), AgentState::Completed, s("bash"), a("claude"));
+
+    sm.mark_all_started();
+
+    let data = sm.get_render_data();
+    for agent in &data {
+        if agent.session == "proj#1" || agent.session == "proj#2" {
+            assert_eq!(agent.state, AgentState::Started);
+        }
+        if agent.session == "other#1" {
+            assert_eq!(agent.state, AgentState::Working);
+        }
+        if agent.session == "done#1" {
+            assert_eq!(agent.state, AgentState::Completed);
+        }
+    }
+    assert!(sm.next_awaiting().is_none());
+    true
+}
+
+fn test_mark_all_started_empty() -> bool {
+    let mut sm = StateManager::new();
+    sm.mark_all_started();
+    assert!(sm.get_render_data().is_empty());
+    true
+}
+
 fn test_stress_1000() -> bool {
     let mut sm = StateManager::new();
     for i in 0..1000 {
@@ -315,6 +363,9 @@ fn full_report() {
         ("monitor_change_reorders", test_monitor_change_reorders),
         ("auto_focus_should_next", test_auto_focus),
         ("cleanup_preserves_other_workspaces", test_cleanup_preserves_other_workspaces),
+        ("clear_all", test_clear_all),
+        ("mark_all_started", test_mark_all_started),
+        ("mark_all_started_empty", test_mark_all_started_empty),
         ("stress_1000_sessions", test_stress_1000),
     ];
 
