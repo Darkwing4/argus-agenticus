@@ -33,7 +33,7 @@
     </key>
 
     <key type="as" name="terminal-wm-classes">
-      <default><![CDATA[['Ptyxis', 'org.gnome.Ptyxis', 'Alacritty', 'kitty', 'foot', 'org.wezfurlong.wezterm', 'gnome-terminal-server', 'Tilix', 'com.raggesilver.BlackBox']]]></default>
+      <default><![CDATA[['Ptyxis', 'org.gnome.Ptyxis', 'Alacritty', 'kitty', 'foot', 'org.wezfurlong.wezterm', 'Gnome-terminal', 'gnome-terminal-server', 'Tilix', 'com.raggesilver.BlackBox']]]></default>
     </key>
   </schema>
 </schemalist>

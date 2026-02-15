@@ -10,8 +10,10 @@ export class WindowTracker {
         this._windowToSession = new Map();
         this._sessionToWindow = new Map();
         this._wmClassPending = new Map();
+        this._windowFirstTitle = new Map();
 
         this.onFocusChanged = null;
+        this.onCursorCliDetected = null;
         this.onWindowTracked = null;
         this.onMonitorChanged = null;
         this.onWorkspaceChanged = null;
@@ -65,6 +67,7 @@ export class WindowTracker {
         this._windowSignals.clear();
         this._windowToSession.clear();
         this._sessionToWindow.clear();
+        this._windowFirstTitle.clear();
 
         for (const [win, id] of this._wmClassPending) {
             win.disconnect(id);
@@ -101,7 +104,19 @@ export class WindowTracker {
             if (typeInfo.wmClasses.some(cls => wmClass.includes(cls)))
                 return [typeName, typeInfo];
         }
+        const title = win.get_title() || '';
+        if (title.startsWith('Cursor Agent'))
+            return ['cursor', AGENT_TYPES.cursor];
         return [null, null];
+    }
+
+    getFirstTitle(win) {
+        return this._windowFirstTitle.get(win) || null;
+    }
+
+    setSessionMapping(win, sessionKey) {
+        this._windowToSession.set(win, sessionKey);
+        this._sessionToWindow.set(sessionKey, win);
     }
 
     rescan() {
@@ -137,6 +152,12 @@ export class WindowTracker {
                 this._sessionToWindow.set(sessionKey, win);
                 this.onWindowTracked?.(win, sessionKey);
             }
+            if (!this._windowFirstTitle.has(win) && !title.startsWith('Cursor Agent')) {
+                this._windowFirstTitle.set(win, title);
+            }
+            if (title.startsWith('Cursor Agent')) {
+                this.onCursorCliDetected?.(win);
+            }
         });
 
         const unmanagedId = win.connect('unmanaged', () => {
@@ -146,10 +167,21 @@ export class WindowTracker {
             win.disconnect(unmanagedId);
             if (session) this._sessionToWindow.delete(session);
             this._windowToSession.delete(win);
+            this._windowFirstTitle.delete(win);
             this._windowSignals.delete(win);
             if (session) this.onWindowUnmanaged?.(session);
         });
 
         this._windowSignals.set(win, [wsId, titleId, unmanagedId]);
+
+        const currentTitle = win.get_title() || '';
+        if (!this._windowFirstTitle.has(win) && currentTitle && !currentTitle.startsWith('Cursor Agent')) {
+            this._windowFirstTitle.set(win, currentTitle);
+        }
+        const currentKey = this.extractSessionKey(currentTitle);
+        if (currentKey) {
+            this._windowToSession.set(win, currentKey);
+            this._sessionToWindow.set(currentKey, win);
+        }
     }
 }

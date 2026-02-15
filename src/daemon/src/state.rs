@@ -107,12 +107,19 @@ impl StateManager {
         AutoFocusEvent::None
     }
 
-    pub fn update_window_focus(&mut self, title: &str) -> bool {
+    pub fn update_window_focus(&mut self, title: &str, agent_type: Option<&str>) -> bool {
         let new_focused = self
             .sessions
             .keys()
             .find(|s| title.contains(Self::get_group(s)))
-            .map(|s| Self::get_group(s).to_string());
+            .map(|s| Self::get_group(s).to_string())
+            .or_else(|| {
+                let at = agent_type.filter(|a| !a.is_empty())?;
+                self.sessions
+                    .iter()
+                    .find(|(_, info)| &*info.agent_type == at)
+                    .map(|(s, _)| Self::get_group(s).to_string())
+            });
 
         let changed = self.focused_group != new_focused;
         self.focused_group = new_focused;
@@ -136,6 +143,13 @@ impl StateManager {
         self.sessions.remove(session).is_some()
     }
 
+    pub fn get_agent_type(&self, session: &str) -> String {
+        self.sessions
+            .get(session)
+            .map(|info| info.agent_type.to_string())
+            .unwrap_or_default()
+    }
+
     pub fn cleanup_ended(&mut self) -> bool {
         let now = Instant::now();
         let before = self.sessions.len();
@@ -152,7 +166,8 @@ impl StateManager {
     }
 
     pub fn update_workspace(&mut self, session: &str, workspace: u32, monitor: u32) {
-        self.workspaces.insert(session.to_string(), (workspace, monitor));
+        let group = Self::get_group(session);
+        self.workspaces.insert(group.to_string(), (workspace, monitor));
     }
 
     fn get_placement(&self, session: &str) -> (u32, u32) {

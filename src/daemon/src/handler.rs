@@ -27,10 +27,11 @@ pub async fn process(
             Effects { reply: None, auto_focus: event, mark_extension: false, broadcast_render: true }
         }
 
-        IncomingMessage::WindowFocus { title } => {
-            debug!("Window focus: {}", title);
+        IncomingMessage::WindowFocus { title, agent_type } => {
+            debug!("Window focus: {} [{}]", title, agent_type);
             let mut s = state.lock().await;
-            s.update_window_focus(&title);
+            let at = if agent_type.is_empty() { None } else { Some(agent_type.as_str()) };
+            s.update_window_focus(&title, at);
             Effects { reply: None, auto_focus: AutoFocusEvent::None, mark_extension: true, broadcast_render: true }
         }
 
@@ -43,8 +44,10 @@ pub async fn process(
 
         IncomingMessage::Click { session } => {
             debug!("Click: {}", session);
+            let s = state.lock().await;
+            let agent_type = s.get_agent_type(&session);
             Effects {
-                reply: Some(OutgoingMessage::Focus { session }),
+                reply: Some(OutgoingMessage::Focus { session, agent_type }),
                 auto_focus: AutoFocusEvent::None,
                 mark_extension: false,
                 broadcast_render: false,
@@ -54,7 +57,10 @@ pub async fn process(
         IncomingMessage::FocusNext => {
             debug!("Focus next");
             let mut s = state.lock().await;
-            let reply = s.focus_next().map(|session| OutgoingMessage::Focus { session });
+            let reply = s.focus_next().map(|session| {
+                let agent_type = s.get_agent_type(&session);
+                OutgoingMessage::Focus { session, agent_type }
+            });
             Effects { reply, auto_focus: AutoFocusEvent::None, mark_extension: false, broadcast_render: false }
         }
 

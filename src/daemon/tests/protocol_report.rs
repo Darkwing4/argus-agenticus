@@ -46,8 +46,22 @@ fn deserialize_window_focus() {
     let json = r#"{"type":"window_focus","title":"proj - editor"}"#;
     let msg: IncomingMessage = serde_json::from_str(json).unwrap();
     match msg {
-        IncomingMessage::WindowFocus { title } => {
+        IncomingMessage::WindowFocus { title, agent_type } => {
             assert_eq!(title, "proj - editor");
+            assert_eq!(agent_type, "");
+        }
+        other => panic!("expected WindowFocus, got {other:?}"),
+    }
+}
+
+#[test]
+fn deserialize_window_focus_with_agent_type() {
+    let json = r#"{"type":"window_focus","title":"file.ts - proj - Cursor","agent_type":"cursor"}"#;
+    let msg: IncomingMessage = serde_json::from_str(json).unwrap();
+    match msg {
+        IncomingMessage::WindowFocus { title, agent_type } => {
+            assert_eq!(title, "file.ts - proj - Cursor");
+            assert_eq!(agent_type, "cursor");
         }
         other => panic!("expected WindowFocus, got {other:?}"),
     }
@@ -146,20 +160,22 @@ fn serialize_render() {
 
 #[test]
 fn serialize_focus() {
-    let msg = OutgoingMessage::Focus { session: "proj#1".to_string() };
+    let msg = OutgoingMessage::Focus { session: "proj#1".to_string(), agent_type: "claude".to_string() };
     let json = serde_json::to_string(&msg).unwrap();
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["type"], "focus");
     assert_eq!(v["session"], "proj#1");
+    assert_eq!(v["agent_type"], "claude");
 }
 
 #[test]
 fn serialize_auto_focus() {
-    let msg = OutgoingMessage::AutoFocus { session: "proj#1".to_string() };
+    let msg = OutgoingMessage::AutoFocus { session: "proj#1".to_string(), agent_type: "claude".to_string() };
     let json = serde_json::to_string(&msg).unwrap();
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["type"], "auto_focus");
     assert_eq!(v["session"], "proj#1");
+    assert_eq!(v["agent_type"], "claude");
 }
 
 #[test]

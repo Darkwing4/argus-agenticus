@@ -246,6 +246,10 @@ class AgentsView extends St.BoxLayout {
         this._windowTracker.onWindowUnmanaged = (session) => {
             this._daemon.send({ type: 'window_closed', session });
         };
+
+        this._windowTracker.onCursorCliDetected = (win) => {
+            this._tryMapCursorCliWindows();
+        };
     }
 
     _wireIdleMonitor() {
@@ -278,10 +282,11 @@ class AgentsView extends St.BoxLayout {
             if (msg.type === 'render') {
                 this._agents = msg.agents;
                 this._updateDots();
+                this._tryMapCursorCliWindows();
             } else if (msg.type === 'focus') {
-                this._focusManager.focusWindow(msg.session);
+                this._focusManager.focusWindow(msg.session, msg.agent_type);
             } else if (msg.type === 'auto_focus') {
-                this._focusManager.handleAutoFocus(msg.session);
+                this._focusManager.handleAutoFocus(msg.session, msg.agent_type);
             } else if (msg.type === 'return_workspace') {
                 this._focusManager.returnWorkspace();
             }
@@ -290,9 +295,30 @@ class AgentsView extends St.BoxLayout {
         }
     }
 
+    _tryMapCursorCliWindows() {
+        for (const agent of this._agents) {
+            if (agent.agent_type !== 'cursor') continue;
+            if (this._windowTracker.getWindowForSession(agent.session)) continue;
+            const groupName = agent.session.split('#')[0];
+            for (const actor of global.get_window_actors()) {
+                const win = actor.meta_window;
+                if (!(win.get_title() || '').startsWith('Cursor Agent')) continue;
+                if (this._windowTracker.getSessionForWindow(win)) continue;
+                const firstTitle = this._windowTracker.getFirstTitle(win);
+                if (firstTitle && firstTitle.includes(groupName)) {
+                    this._windowTracker.setSessionMapping(win, agent.session);
+                    this._focusManager.sendWorkspaceForWindow(win, (msg) => this._daemon.send(msg));
+                    break;
+                }
+            }
+        }
+    }
+
     _updateDots() {
         const visible = this._renderer.updateDots(this._agents, {
-            onDotClicked: (session) => this._daemon.send({ type: 'click', session }),
+            onDotClicked: (session) => {
+                this._daemon.send({ type: 'click', session });
+            },
         }, {
             dotSize: this._dotSize,
             showLabels: this._showLabels,

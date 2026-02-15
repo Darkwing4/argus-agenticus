@@ -7,16 +7,14 @@ LOG="$HOME/Desktop/agents-monitor-v2.log"
 if echo "$INPUT" | jq -e '.cursor_version' > /dev/null 2>&1; then
     AGENT_TYPE="cursor"
     CONV_ID=$(echo "$INPUT" | jq -r '.conversation_id // "unknown"')
+    WORKSPACE=$(echo "$INPUT" | jq -r '.workspace_roots[0] // empty')
     if [ -n "$ZELLIJ_SESSION_NAME" ]; then
         SESSION="${ZELLIJ_SESSION_NAME}#c-${CONV_ID:0:8}"
+    elif [ -n "$WORKSPACE" ]; then
+        NAME=$(basename "$WORKSPACE")
+        SESSION="${NAME}#c-${CONV_ID:0:8}"
     else
-        SID=$(ps -o sid= -p $$ 2>/dev/null | tr -d ' ')
-        if [ -n "$SID" ] && [ "$SID" != "0" ]; then
-            NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")")
-            SESSION="${NAME}#c-${CONV_ID:0:8}"
-        else
-            SESSION="cursor#${CONV_ID:0:8}"
-        fi
+        SESSION="cursor#${CONV_ID:0:8}"
     fi
 else
     AGENT_TYPE="claude"
@@ -55,7 +53,7 @@ case "$EVENT" in
     ;;
 esac
 
-if [ -z "$ZELLIJ_SESSION_NAME" ] && [ "$STATE" = "started" ]; then
+if [ -z "$ZELLIJ_SESSION_NAME" ]; then
     printf '\033]0;Argus (%s)\a' "$SESSION" > /dev/tty 2>/dev/null || true
 fi
 

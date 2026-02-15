@@ -4,7 +4,7 @@ export const AGENT_TYPES = {
         dotClass: null,
     },
     cursor: {
-        wmClasses: ['Cursor'],
+        wmClasses: ['cursor', 'Cursor'],
         dotClass: 'agent-dot-cursor',
     },
 };
