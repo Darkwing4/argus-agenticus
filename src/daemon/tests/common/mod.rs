@@ -29,7 +29,7 @@ pub fn msg_state(session: &str, state: AgentState) -> IncomingMessage {
 }
 
 pub fn msg_window_focus(title: &str) -> IncomingMessage {
-    IncomingMessage::WindowFocus { title: to_s(title) }
+    IncomingMessage::WindowFocus { title: to_s(title), agent_type: String::new() }
 }
 
 pub fn msg_workspace(session: &str, ws: u32) -> IncomingMessage {
@@ -73,7 +73,7 @@ pub fn should_not_broadcast(fx: &Effects) {
 
 pub fn should_reply_focus(fx: &Effects, session: &str) {
     match &fx.reply {
-        Some(OutgoingMessage::Focus { session: s }) => {
+        Some(OutgoingMessage::Focus { session: s, .. }) => {
             assert_eq!(s, session, "expected Focus for '{session}', got '{s}'");
         }
         other => panic!("expected Focus reply for '{session}', got {other:?}"),

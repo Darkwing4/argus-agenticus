@@ -46,13 +46,20 @@ pub fn spawn_auto_focus(
 
                 tokio::select! {
                     _ = tokio::time::sleep(Duration::from_millis(delay)) => {
-                        let session = {
+                        let result = {
                             let mut s = state.lock().await;
-                            if s.should_auto_focus() { s.next_awaiting() } else { None }
+                            if s.should_auto_focus() {
+                                s.next_awaiting().map(|session| {
+                                    let agent_type = s.get_agent_type(&session);
+                                    (session, agent_type)
+                                })
+                            } else {
+                                None
+                            }
                         };
-                        if let Some(session) = session {
+                        if let Some((session, agent_type)) = result {
                             debug!("Auto-focus: {}", session);
-                            let _ = tx.send(OutgoingMessage::AutoFocus { session });
+                            let _ = tx.send(OutgoingMessage::AutoFocus { session, agent_type });
                         }
                         break;
                     }

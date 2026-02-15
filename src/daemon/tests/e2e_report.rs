@@ -229,6 +229,64 @@ async fn empty_lines_ignored() {
 }
 
 #[tokio::test]
+async fn window_focus_with_agent_type() {
+    let srv = TestServer::start("agent_type_focus").await;
+    let mut ext = srv.connect().await;
+    let mut agent = srv.connect().await;
+
+    ext.send(r#"{"type":"idle_status","idle":true}"#).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    agent.send(r#"{"type":"state","session":"cursor#c-abc","state":"completed","tool":"Shell","agent_type":"cursor"}"#).await;
+    let render = ext.recv().await;
+    assert_eq!(render["agents"][0]["state"], "completed");
+
+    ext.send(r#"{"type":"window_focus","title":"file.ts - SomeProject - Cursor","agent_type":"cursor"}"#).await;
+    let render = ext.recv().await;
+    assert_eq!(render["agents"][0]["state"], "started");
+
+    srv.shutdown().await;
+}
+
+#[tokio::test]
+async fn click_returns_agent_type() {
+    let srv = TestServer::start("click_agent_type").await;
+    let mut c = srv.connect().await;
+
+    c.send(r#"{"type":"state","session":"proj#c-abc","state":"started","tool":"Shell","agent_type":"cursor"}"#).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    c.send(r#"{"type":"click","session":"proj#c-abc"}"#).await;
+    let resp = c.recv().await;
+
+    assert_eq!(resp["type"], "focus");
+    assert_eq!(resp["session"], "proj#c-abc");
+    assert_eq!(resp["agent_type"], "cursor");
+
+    srv.shutdown().await;
+}
+
+#[tokio::test]
+async fn repeated_click_same_session() {
+    let srv = TestServer::start("repeated_click").await;
+    let mut c = srv.connect().await;
+
+    c.send(r#"{"type":"state","session":"proj#s1","state":"started","tool":"bash","agent_type":"claude"}"#).await;
+    c.send(r#"{"type":"state","session":"proj#s2","state":"started","tool":"bash","agent_type":"claude"}"#).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    for _ in 0..5 {
+        c.send(r#"{"type":"click","session":"proj#s1"}"#).await;
+        let resp = c.recv().await;
+        assert_eq!(resp["type"], "focus");
+        assert_eq!(resp["session"], "proj#s1");
+        assert_eq!(resp["agent_type"], "claude");
+    }
+
+    srv.shutdown().await;
+}
+
+#[tokio::test]
 async fn concurrent_clients() {
     let srv = TestServer::start("concurrent").await;
     let mut c1 = srv.connect().await;

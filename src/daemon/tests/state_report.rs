@@ -81,7 +81,7 @@ fn test_update_state_left_awaiting() -> bool {
 fn test_update_state_completed_focused() -> bool {
     let mut sm = StateManager::new();
     sm.update_state(s("proj#1"), AgentState::Started, s("bash"), a("claude"));
-    sm.update_window_focus("proj - editor");
+    sm.update_window_focus("proj - editor", None);
 
     let ev = sm.update_state(s("proj#1"), AgentState::Completed, s("bash"), a("claude"));
     assert_eq!(ev, AutoFocusEvent::None);
@@ -110,7 +110,7 @@ fn test_update_window_focus() -> bool {
     let mut sm = StateManager::new();
     sm.update_state(s("proj#1"), AgentState::Completed, s("bash"), a("claude"));
 
-    let changed = sm.update_window_focus("proj - editor");
+    let changed = sm.update_window_focus("proj - editor", None);
     assert!(changed);
 
     let data = sm.get_render_data();
@@ -324,6 +324,41 @@ fn test_mark_all_started_empty() -> bool {
     true
 }
 
+fn test_cursor_window_focus_by_title() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("myproj#c-abc12345"), AgentState::Completed, s("Shell"), a("cursor"));
+
+    let changed = sm.update_window_focus("file.ts - myproj - Cursor", None);
+    assert!(changed);
+
+    let data = sm.get_render_data();
+    assert_eq!(data[0].state, AgentState::Started);
+    assert!(data[0].focused);
+    true
+}
+
+fn test_cursor_window_focus_by_agent_type() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("cursor#c-abc12345"), AgentState::Completed, s("Shell"), a("cursor"));
+
+    let changed = sm.update_window_focus("file.ts - SomeProject - Cursor", Some("cursor"));
+    assert!(changed);
+
+    let data = sm.get_render_data();
+    assert_eq!(data[0].state, AgentState::Started);
+    assert!(data[0].focused);
+    true
+}
+
+fn test_get_agent_type() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("proj#c-abc"), AgentState::Started, s("Shell"), a("cursor"));
+
+    assert_eq!(sm.get_agent_type("proj#c-abc"), "cursor");
+    assert_eq!(sm.get_agent_type("nonexistent#1"), "");
+    true
+}
+
 fn test_stress_1000() -> bool {
     let mut sm = StateManager::new();
     for i in 0..1000 {
@@ -366,6 +401,9 @@ fn full_report() {
         ("clear_all", test_clear_all),
         ("mark_all_started", test_mark_all_started),
         ("mark_all_started_empty", test_mark_all_started_empty),
+        ("cursor_window_focus_by_title", test_cursor_window_focus_by_title),
+        ("cursor_window_focus_by_agent_type", test_cursor_window_focus_by_agent_type),
+        ("get_agent_type", test_get_agent_type),
         ("stress_1000_sessions", test_stress_1000),
     ];
 
