@@ -90,6 +90,12 @@ export class WindowTracker {
         if (match) return match[1];
         match = title.match(/^([^|]+?)\s*\|/);
         if (match) return match[1].trim();
+        match = title.match(/^.+\s[\u2014\u2013\-]\s(.+?)\s[\u2014\u2013\-]\sCursor$/);
+        if (match) return match[1];
+        match = title.match(/^(.+?)\s[\u2014\u2013\-]\sCursor$/);
+        if (match) return match[1];
+        if (title.includes('ursor'))
+            logError(new Error(`extractSessionKey miss: "${title}"`));
         return null;
     }
 
