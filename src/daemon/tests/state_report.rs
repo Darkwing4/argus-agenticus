@@ -359,6 +359,86 @@ fn test_get_agent_type() -> bool {
     true
 }
 
+fn test_stale_cursor_started_becomes_ended() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("proj#c-abc123"), AgentState::Started, s("Shell"), a("cursor"));
+
+    let changed = sm.cleanup_ended();
+    assert!(!changed);
+    assert_eq!(sm.get_render_data().len(), 1);
+
+    sm.force_stale_session("proj#c-abc123");
+
+    let changed = sm.cleanup_ended();
+    assert!(changed);
+    let data = sm.get_render_data();
+    assert_eq!(data.len(), 1);
+    assert_eq!(data[0].state, AgentState::Ended);
+
+    sm.force_expire_session("proj#c-abc123");
+    let changed = sm.cleanup_ended();
+    assert!(changed);
+    assert!(sm.get_render_data().is_empty());
+    true
+}
+
+fn test_stale_claude_started_not_removed() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("proj#1"), AgentState::Started, s("bash"), a("claude"));
+
+    sm.force_stale_session("proj#1");
+
+    let changed = sm.cleanup_ended();
+    assert!(!changed);
+    assert_eq!(sm.get_render_data().len(), 1);
+    true
+}
+
+fn test_stale_cursor_completed_not_removed() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("proj#c-abc123"), AgentState::Completed, s("Shell"), a("cursor"));
+
+    sm.force_stale_session("proj#c-abc123");
+
+    let changed = sm.cleanup_ended();
+    assert!(!changed);
+    assert_eq!(sm.get_render_data().len(), 1);
+    true
+}
+
+fn test_stale_cursor_focused_not_removed() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("proj#c-abc123"), AgentState::Started, s("Shell"), a("cursor"));
+    sm.update_window_focus("file.ts - proj - Cursor", Some("cursor"));
+    sm.force_stale_session("proj#c-abc123");
+
+    let changed = sm.cleanup_ended();
+    assert!(!changed);
+    assert_eq!(sm.get_render_data().len(), 1);
+    assert_eq!(sm.get_render_data()[0].state, AgentState::Started);
+
+    sm.update_window_focus("some other window", None);
+
+    let changed = sm.cleanup_ended();
+    assert!(changed);
+    assert_eq!(sm.get_render_data()[0].state, AgentState::Ended);
+    true
+}
+
+fn test_stale_cursor_activity_resets_timer() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("proj#c-abc123"), AgentState::Started, s("Shell"), a("cursor"));
+    sm.force_stale_session("proj#c-abc123");
+
+    sm.update_state(s("proj#c-abc123"), AgentState::Working, s("Read"), a("cursor"));
+    sm.update_state(s("proj#c-abc123"), AgentState::Started, s("Read"), a("cursor"));
+
+    let changed = sm.cleanup_ended();
+    assert!(!changed);
+    assert_eq!(sm.get_render_data().len(), 1);
+    true
+}
+
 fn test_stress_1000() -> bool {
     let mut sm = StateManager::new();
     for i in 0..1000 {
@@ -404,6 +484,11 @@ fn full_report() {
         ("cursor_window_focus_by_title", test_cursor_window_focus_by_title),
         ("cursor_window_focus_by_agent_type", test_cursor_window_focus_by_agent_type),
         ("get_agent_type", test_get_agent_type),
+        ("stale_cursor_started_becomes_ended", test_stale_cursor_started_becomes_ended),
+        ("stale_claude_started_not_removed", test_stale_claude_started_not_removed),
+        ("stale_cursor_completed_not_removed", test_stale_cursor_completed_not_removed),
+        ("stale_cursor_focused_not_removed", test_stale_cursor_focused_not_removed),
+        ("stale_cursor_activity_resets_timer", test_stale_cursor_activity_resets_timer),
         ("stress_1000_sessions", test_stress_1000),
     ];
 
