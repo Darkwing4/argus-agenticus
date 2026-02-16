@@ -134,8 +134,8 @@ class AgentsView extends St.BoxLayout {
 
         if (!this._radioMenus)
             this._radioMenus = {};
-        this._radioMenus[settingsKey] = items;
 
+        this._radioMenus[settingsKey] = items;
         this._updateRadioOrnaments(settingsKey, this._settings.get_string(settingsKey));
     }
 
@@ -267,6 +267,7 @@ class AgentsView extends St.BoxLayout {
 
     _onFocusWindowChanged() {
         const win = global.display.get_focus_window();
+
         if (!win)
             return;
 

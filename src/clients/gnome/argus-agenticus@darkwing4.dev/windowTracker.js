@@ -85,17 +85,28 @@ export class WindowTracker {
 
     extractSessionKey(title) {
         let match = title.match(/Argus \(([^)]+)\)/);
-        if (match) return match[1];
+        if (match)
+            return match[1];
+
         match = title.match(/Zellij \(([^)]+)\)/);
-        if (match) return match[1];
+        if (match)
+            return match[1];
+
         match = title.match(/^([^|]+?)\s*\|/);
-        if (match) return match[1].trim();
+        if (match)
+            return match[1].trim();
+
         match = title.match(/^.+\s[\u2014\u2013\-]\s(.+?)\s[\u2014\u2013\-]\sCursor$/);
-        if (match) return match[1];
+        if (match)
+            return match[1];
+
         match = title.match(/^(.+?)\s[\u2014\u2013\-]\sCursor$/);
-        if (match) return match[1];
+        if (match)
+            return match[1];
+
         if (title.includes('ursor'))
             logError(new Error(`extractSessionKey miss: "${title}"`));
+
         return null;
     }
 
@@ -171,11 +182,15 @@ export class WindowTracker {
             win.disconnect(wsId);
             win.disconnect(titleId);
             win.disconnect(unmanagedId);
-            if (session) this._sessionToWindow.delete(session);
+            if (session)
+                this._sessionToWindow.delete(session);
+
             this._windowToSession.delete(win);
             this._windowFirstTitle.delete(win);
             this._windowSignals.delete(win);
-            if (session) this.onWindowUnmanaged?.(session);
+
+            if (session)
+                this.onWindowUnmanaged?.(session);
         });
 
         this._windowSignals.set(win, [wsId, titleId, unmanagedId]);
