@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use crate::protocol::{AgentInfo, AgentState};
 
 const ENDED_HIDE_DELAY: Duration = Duration::from_secs(10);
+const STALE_TIMEOUT: Duration = Duration::from_secs(30);
 const FOCUS_PRIORITIES: &[AgentState] = &[
     AgentState::Awaiting,
     AgentState::Completed,
@@ -25,6 +26,7 @@ pub struct SessionInfo {
     pub tool: String,
     pub agent_type: Arc<str>,
     pub ended_at: Option<Instant>,
+    pub last_activity: Instant,
 }
 
 pub struct StateManager {
@@ -78,6 +80,7 @@ impl StateManager {
                 tool,
                 agent_type,
                 ended_at,
+                last_activity: Instant::now(),
             },
         );
 
@@ -107,12 +110,19 @@ impl StateManager {
         AutoFocusEvent::None
     }
 
-    pub fn update_window_focus(&mut self, title: &str) -> bool {
+    pub fn update_window_focus(&mut self, title: &str, agent_type: Option<&str>) -> bool {
         let new_focused = self
             .sessions
             .keys()
             .find(|s| title.contains(Self::get_group(s)))
-            .map(|s| Self::get_group(s).to_string());
+            .map(|s| Self::get_group(s).to_string())
+            .or_else(|| {
+                let at = agent_type.filter(|a| !a.is_empty())?;
+                self.sessions
+                    .iter()
+                    .find(|(_, info)| &*info.agent_type == at)
+                    .map(|(s, _)| Self::get_group(s).to_string())
+            });
 
         let changed = self.focused_group != new_focused;
         self.focused_group = new_focused;
@@ -136,23 +146,44 @@ impl StateManager {
         self.sessions.remove(session).is_some()
     }
 
+    pub fn get_agent_type(&self, session: &str) -> String {
+        self.sessions
+            .get(session)
+            .map(|info| info.agent_type.to_string())
+            .unwrap_or_default()
+    }
+
     pub fn cleanup_ended(&mut self) -> bool {
         let now = Instant::now();
-        let before = self.sessions.len();
+        let mut changed = false;
 
+        for (session, info) in self.sessions.iter_mut() {
+            if info.ended_at.is_none()
+                && &*info.agent_type != "claude"
+                && info.state == AgentState::Started
+                && now.duration_since(info.last_activity) >= STALE_TIMEOUT
+                && self.focused_group.as_deref() != Some(Self::get_group(session))
+            {
+                info.state = AgentState::Ended;
+                info.ended_at = Some(now);
+                changed = true;
+            }
+        }
+
+        let before = self.sessions.len();
         self.sessions.retain(|_, info| {
             if let Some(ended_at) = info.ended_at {
-                now.duration_since(ended_at) < ENDED_HIDE_DELAY
-            } else {
-                true
+                return now.duration_since(ended_at) < ENDED_HIDE_DELAY;
             }
+            true
         });
 
-        self.sessions.len() != before
+        changed || self.sessions.len() != before
     }
 
     pub fn update_workspace(&mut self, session: &str, workspace: u32, monitor: u32) {
-        self.workspaces.insert(session.to_string(), (workspace, monitor));
+        let group = Self::get_group(session);
+        self.workspaces.insert(group.to_string(), (workspace, monitor));
     }
 
     fn get_placement(&self, session: &str) -> (u32, u32) {
@@ -268,6 +299,13 @@ impl StateManager {
     pub fn force_expire_session(&mut self, session: &str) {
         if let Some(info) = self.sessions.get_mut(session) {
             info.ended_at = Some(Instant::now() - Duration::from_secs(60));
+        }
+    }
+
+    #[cfg(feature = "test-helpers")]
+    pub fn force_stale_session(&mut self, session: &str) {
+        if let Some(info) = self.sessions.get_mut(session) {
+            info.last_activity = Instant::now() - Duration::from_secs(120);
         }
     }
 }

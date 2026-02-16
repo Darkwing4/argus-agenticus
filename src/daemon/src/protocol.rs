@@ -25,6 +25,8 @@ pub enum IncomingMessage {
     },
     WindowFocus {
         title: String,
+        #[serde(default)]
+        agent_type: String,
     },
     SessionWorkspace {
         session: String,
@@ -67,7 +69,7 @@ pub struct AgentInfo {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum OutgoingMessage {
     Render { agents: Vec<AgentInfo> },
-    Focus { session: String },
-    AutoFocus { session: String },
+    Focus { session: String, agent_type: String },
+    AutoFocus { session: String, agent_type: String },
     ReturnWorkspace,
 }

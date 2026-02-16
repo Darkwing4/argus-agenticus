@@ -24,27 +24,45 @@ pub async fn process(
             let agent_type: Arc<str> = agent_type.into();
             let mut s = state.lock().await;
             let event = s.update_state(session, agent_state, tool, agent_type);
-            Effects { reply: None, auto_focus: event, mark_extension: false, broadcast_render: true }
+            Effects {
+                reply: None,
+                auto_focus: event,
+                mark_extension: false,
+                broadcast_render: true,
+            }
         }
 
-        IncomingMessage::WindowFocus { title } => {
-            debug!("Window focus: {}", title);
+        IncomingMessage::WindowFocus { title, agent_type } => {
+            debug!("Window focus: {} [{}]", title, agent_type);
             let mut s = state.lock().await;
-            s.update_window_focus(&title);
-            Effects { reply: None, auto_focus: AutoFocusEvent::None, mark_extension: true, broadcast_render: true }
+            let at = if agent_type.is_empty() { None } else { Some(agent_type.as_str()) };
+            s.update_window_focus(&title, at);
+            Effects {
+                reply: None,
+                auto_focus: AutoFocusEvent::None,
+                mark_extension: true,
+                broadcast_render: true,
+            }
         }
 
         IncomingMessage::SessionWorkspace { session, workspace, monitor } => {
             debug!("Session workspace: {} -> ws:{} mon:{}", session, workspace, monitor);
             let mut s = state.lock().await;
             s.update_workspace(&session, workspace, monitor);
-            Effects { reply: None, auto_focus: AutoFocusEvent::None, mark_extension: false, broadcast_render: true }
+            Effects {
+                reply: None,
+                auto_focus: AutoFocusEvent::None,
+                mark_extension: false,
+                broadcast_render: true,
+            }
         }
 
         IncomingMessage::Click { session } => {
             debug!("Click: {}", session);
+            let s = state.lock().await;
+            let agent_type = s.get_agent_type(&session);
             Effects {
-                reply: Some(OutgoingMessage::Focus { session }),
+                reply: Some(OutgoingMessage::Focus { session, agent_type }),
                 auto_focus: AutoFocusEvent::None,
                 mark_extension: false,
                 broadcast_render: false,
@@ -54,43 +72,76 @@ pub async fn process(
         IncomingMessage::FocusNext => {
             debug!("Focus next");
             let mut s = state.lock().await;
-            let reply = s.focus_next().map(|session| OutgoingMessage::Focus { session });
-            Effects { reply, auto_focus: AutoFocusEvent::None, mark_extension: false, broadcast_render: false }
+            let reply = s.focus_next().map(|session| {
+                let agent_type = s.get_agent_type(&session);
+                OutgoingMessage::Focus { session, agent_type }
+            });
+            Effects {
+                reply,
+                auto_focus: AutoFocusEvent::None,
+                mark_extension: false,
+                broadcast_render: false,
+            }
         }
 
         IncomingMessage::IdleStatus { idle } => {
             debug!("Idle status: {}", idle);
             let mut s = state.lock().await;
             s.set_idle(idle);
-            Effects { reply: None, auto_focus: AutoFocusEvent::Trigger, mark_extension: true, broadcast_render: false }
+            Effects {
+                reply: None,
+                auto_focus: AutoFocusEvent::Trigger,
+                mark_extension: true,
+                broadcast_render: false,
+            }
         }
 
         IncomingMessage::ClearAgents => {
             debug!("Clear agents");
             let mut s = state.lock().await;
             s.clear_all();
-            Effects { reply: None, auto_focus: AutoFocusEvent::None, mark_extension: false, broadcast_render: true }
+            Effects {
+                reply: None,
+                auto_focus: AutoFocusEvent::None,
+                mark_extension: false,
+                broadcast_render: true,
+            }
         }
 
         IncomingMessage::MarkAllStarted => {
             debug!("Mark all started");
             let mut s = state.lock().await;
             s.mark_all_started();
-            Effects { reply: None, auto_focus: AutoFocusEvent::None, mark_extension: false, broadcast_render: true }
+            Effects {
+                reply: None,
+                auto_focus: AutoFocusEvent::None,
+                mark_extension: false,
+                broadcast_render: true,
+            }
         }
 
         IncomingMessage::AutoFocusConfig { enabled, focus_delay_ms } => {
             debug!("Auto-focus config: enabled={}, delay={}ms", enabled, focus_delay_ms);
             let mut s = state.lock().await;
             s.set_auto_focus_config(enabled, focus_delay_ms);
-            Effects { reply: None, auto_focus: AutoFocusEvent::Trigger, mark_extension: true, broadcast_render: false }
+            Effects {
+                reply: None,
+                auto_focus: AutoFocusEvent::Trigger,
+                mark_extension: true,
+                broadcast_render: false,
+            }
         }
 
         IncomingMessage::WindowClosed { session } => {
             debug!("Window closed: {}", session);
             let mut s = state.lock().await;
             s.remove_session(&session);
-            Effects { reply: None, auto_focus: AutoFocusEvent::None, mark_extension: false, broadcast_render: true }
+            Effects {
+                reply: None,
+                auto_focus: AutoFocusEvent::None,
+                mark_extension: false,
+                broadcast_render: true,
+            }
         }
     }
 }
