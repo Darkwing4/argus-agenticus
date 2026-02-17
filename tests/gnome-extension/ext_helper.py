@@ -123,6 +123,28 @@ class ExtView:
             return cls not in classes
         return await self._poll(check, True, timeout)
 
+    async def dot_visual_order(self):
+        val = await self._eval(_wrap(
+            "let r = []; "
+            "let box = _view._renderer._groupsBox; "
+            "for (let gi = 0; gi < box.get_n_children(); gi++) { "
+            "  let c = box.get_child_at_index(gi); "
+            "  for (let di = 0; di < c.get_n_children(); di++) { "
+            "    let child = c.get_child_at_index(di); "
+            "    for (let [s, w] of _view._renderer._dotWidgets) { "
+            "      if (w.button === child) { r.push(s); break; } "
+            "    } "
+            "  } "
+            "} "
+            "return r.join('|');"
+        ))
+        if not val:
+            return []
+        return val.split('|')
+
+    async def wait_dot_visual_order(self, expected, timeout=2.0):
+        return await self._poll(self.dot_visual_order, expected, timeout)
+
     async def wait_tooltip(self, expected, timeout=2.0):
         return await self._poll(self.tooltip_text, expected, timeout)
 
