@@ -168,7 +168,7 @@ if [ "$MODE" = "interactive" ]; then
     exec bash --norc --noprofile -i
 else
     VENV=""
-    for candidate in "$REPO_ROOT/.venv/bin/pytest" "$REPO_ROOT/../../.venv/bin/pytest"; do
+    for candidate in "$REPO_ROOT/.venv/bin/pytest" "$REPO_ROOT/../.venv/bin/pytest" "$REPO_ROOT/../../.venv/bin/pytest"; do
         [ -x "$candidate" ] && { VENV="$candidate"; break; }
     done
     if [ -z "$VENV" ]; then
