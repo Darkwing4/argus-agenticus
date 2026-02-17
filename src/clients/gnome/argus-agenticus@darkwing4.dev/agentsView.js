@@ -34,6 +34,8 @@ class AgentsView extends St.BoxLayout {
         this._idleMonitor = new IdleMonitor(this._inputIdleThresholdMs);
 
         const { logo, autoFocusButton, groupsBox } = this._renderer.createPanelContent();
+        this._autoFocusButton = autoFocusButton;
+        this._groupsBox = groupsBox;
         this.add_child(logo);
 
         autoFocusButton.connect('clicked', () => {
@@ -324,7 +326,8 @@ class AgentsView extends St.BoxLayout {
             dotSize: this._dotSize,
             showLabels: this._showLabels,
         });
-        this.visible = visible;
+        this._groupsBox.visible = visible;
+        this._autoFocusButton.visible = visible;
     }
 
     focusNext() {
