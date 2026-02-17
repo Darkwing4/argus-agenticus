@@ -2,7 +2,7 @@
 INPUT=$(timeout 1 cat 2>/dev/null || echo '{}')
 read -r EVENT TOOL IS_INTERRUPT <<< $(echo "$INPUT" | jq -r '[.hook_event_name // "unknown", .tool_name // "", .is_interrupt // false] | @tsv')
 
-LOG="$HOME/Desktop/agents-monitor-v2.log"
+LOG="${XDG_RUNTIME_DIR:-/tmp}/argus-agenticus/hook.log"
 
 if echo "$INPUT" | jq -e '.cursor_version' > /dev/null 2>&1; then
     AGENT_TYPE="cursor"
@@ -48,7 +48,7 @@ case "$EVENT" in
   Stop|stop)                                          STATE="completed" ;;
   SessionEnd|sessionEnd)                              STATE="ended" ;;
   *)
-    echo "$(date '+%H:%M:%S') SKIP agent=$AGENT_TYPE event=$EVENT" >> "$LOG" 2>/dev/null
+    [ "${ARGUS_DEBUG:-}" = "1" ] && echo "$(date '+%H:%M:%S') SKIP agent=$AGENT_TYPE event=$EVENT" >> "$LOG" 2>/dev/null
     exit 0
     ;;
 esac
@@ -60,7 +60,7 @@ fi
 SOCK="${XDG_RUNTIME_DIR:-/tmp}/agents-monitor/daemon.sock"
 MSG="{\"type\":\"state\",\"session\":\"$SESSION\",\"state\":\"$STATE\",\"tool\":\"$TOOL\",\"agent_type\":\"$AGENT_TYPE\"}"
 
-echo "$(date '+%H:%M:%S') $AGENT_TYPE $SESSION $STATE event=$EVENT tool=$TOOL" >> "$LOG" 2>/dev/null
+[ "${ARGUS_DEBUG:-}" = "1" ] && mkdir -p "$(dirname "$LOG")" && echo "$(date '+%H:%M:%S') $AGENT_TYPE $SESSION $STATE event=$EVENT tool=$TOOL" >> "$LOG" 2>/dev/null
 
 if command -v socat >/dev/null 2>&1; then
   echo "$MSG" | timeout 2 socat - "UNIX-CONNECT:$SOCK" 2>/dev/null || true
