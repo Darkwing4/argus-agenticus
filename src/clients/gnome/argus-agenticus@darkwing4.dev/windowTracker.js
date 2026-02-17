@@ -104,8 +104,7 @@ export class WindowTracker {
         if (match)
             return match[1];
 
-        if (title.includes('ursor'))
-            logError(new Error(`extractSessionKey miss: "${title}"`));
+        logError(new Error(`extractSessionKey: no pattern matched "${title}"`));
 
         return null;
     }
