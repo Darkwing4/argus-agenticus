@@ -23,6 +23,8 @@ pub enum IncomingMessage {
         #[serde(default = "default_agent_type")]
         agent_type: String,
         #[serde(default)]
+        session_name: Option<String>,
+        #[serde(default)]
         uncommitted_count: Option<u32>,
         #[serde(default)]
         multiplexer: Option<String>,
@@ -76,6 +78,8 @@ pub struct AgentInfo {
     pub focused: bool,
     pub group: u32,
     pub agent_type: Arc<str>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_name: Option<String>,
     #[serde(default)]
     pub tool: String,
     pub awaiting_since_unix: Option<u64>,

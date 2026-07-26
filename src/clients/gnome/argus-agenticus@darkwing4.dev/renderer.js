@@ -313,7 +313,7 @@ export class Renderer {
     }
 
     _buildTooltip(agent) {
-        const lines = [agent.session];
+        const lines = [agent.session_name || agent.session];
 
         if (agent.state === 'awaiting' && agent.awaiting_since_unix) {
             const elapsed = Math.floor(Date.now() / 1000) - agent.awaiting_since_unix;

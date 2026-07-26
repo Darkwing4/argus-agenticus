@@ -55,6 +55,7 @@ pub struct SessionInfo {
     pub state: AgentState,
     pub tool: String,
     pub agent_type: Arc<str>,
+    pub session_name: Option<String>,
     pub ended_at: Option<Instant>,
     pub last_activity: Instant,
     pub awaiting_since: Option<Instant>,
@@ -123,6 +124,10 @@ impl StateManager {
         let uncommitted_count = uncommitted_count
             .or_else(|| self.sessions.get(&session).and_then(|s| s.uncommitted_count));
 
+        let session_name = self.sessions
+            .get(&session)
+            .and_then(|s| s.session_name.clone());
+
         let multiplexer = multiplexer
             .or_else(|| self.sessions.get(&session).and_then(|s| s.multiplexer.clone()));
 
@@ -132,6 +137,7 @@ impl StateManager {
                 state: actual_state,
                 tool,
                 agent_type,
+                session_name,
                 ended_at,
                 last_activity: Instant::now(),
                 awaiting_since,
@@ -187,6 +193,21 @@ impl StateManager {
         }
 
         AutoFocusEvent::None
+    }
+
+    pub fn set_session_name(&mut self, session: &str, session_name: Option<String>) {
+        let Some(session_name) = session_name else {
+            return;
+        };
+        let Some(info) = self.sessions.get_mut(session) else {
+            return;
+        };
+
+        info.session_name = if session_name.is_empty() {
+            None
+        } else {
+            Some(session_name)
+        };
     }
 
     pub fn update_window_focus(&mut self, title: &str, agent_type: Option<&str>) -> (bool, AutoFocusEvent) {
@@ -487,6 +508,7 @@ impl StateManager {
                 focused,
                 group,
                 agent_type: info.agent_type.clone(),
+                session_name: info.session_name.clone(),
                 tool: info.tool.clone(),
                 awaiting_since_unix,
                 uncommitted_count: info.uncommitted_count,

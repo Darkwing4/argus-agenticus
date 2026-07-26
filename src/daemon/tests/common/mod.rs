@@ -25,6 +25,7 @@ pub fn msg_state(session: &str, state: AgentState) -> IncomingMessage {
         state,
         tool: to_s("bash"),
         agent_type: to_s("claude"),
+        session_name: None,
         uncommitted_count: None,
         multiplexer: None,
     }
@@ -36,6 +37,7 @@ pub fn msg_state_zellij(session: &str, state: AgentState) -> IncomingMessage {
         state,
         tool: to_s("bash"),
         agent_type: to_s("claude"),
+        session_name: None,
         uncommitted_count: None,
         multiplexer: Some(to_s("zellij")),
     }

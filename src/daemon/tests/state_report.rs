@@ -52,6 +52,20 @@ fn a(name: &str) -> Arc<str> {
     Arc::from(name)
 }
 
+#[test]
+fn session_name_updates_persists_and_clears() {
+    let mut sm = StateManager::new();
+    sm.update_state(s("proj#1"), AgentState::Started, s("bash"), a("claude"), None, None);
+    sm.set_session_name("proj#1", Some(s("Renamed session")));
+    sm.update_state(s("proj#1"), AgentState::Working, s("Read"), a("claude"), None, None);
+
+    assert_eq!(sm.get_render_data()[0].session_name.as_deref(), Some("Renamed session"));
+
+    sm.set_session_name("proj#1", Some(String::new()));
+
+    assert_eq!(sm.get_render_data()[0].session_name, None);
+}
+
 fn test_update_state_awaiting() -> bool {
     let mut sm = StateManager::new();
     let ev = sm.update_state(s("proj#1"), AgentState::Started, s("bash"), a("claude"), None, None);

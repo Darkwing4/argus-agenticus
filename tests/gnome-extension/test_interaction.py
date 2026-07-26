@@ -15,7 +15,17 @@ async def test_focus_next_sends_message(ext, view):
     assert msg["type"] == "focus_next"
 
 
-async def test_tooltip_on_hover(ext, view):
+async def test_tooltip_uses_session_name_on_hover(ext, view):
+    named_agent = agent()
+    named_agent["session_name"] = "Renamed session"
+    await ext.render([named_agent])
+    await view.wait_dot_count(1)
+    await view.hover_dot("proj#1", enter=True)
+    await view.wait_tooltip("Renamed session")
+    await view.hover_dot("proj#1", enter=False)
+
+
+async def test_tooltip_falls_back_to_session_on_hover(ext, view):
     await ext.render([agent()])
     await view.wait_dot_count(1)
     await view.hover_dot("proj#1", enter=True)

@@ -4,14 +4,15 @@ use argus_agenticus::protocol::{AgentInfo, AgentState, IncomingMessage, Outgoing
 
 #[test]
 fn deserialize_state() {
-    let json = r#"{"type":"state","session":"p#1","state":"started","tool":"bash","agent_type":"claude"}"#;
+    let json = r#"{"type":"state","session":"p#1","state":"started","tool":"bash","agent_type":"claude","session_name":"Renamed session"}"#;
     let msg: IncomingMessage = serde_json::from_str(json).unwrap();
     match msg {
-        IncomingMessage::State { session, state, tool, agent_type, .. } => {
+        IncomingMessage::State { session, state, tool, agent_type, session_name, .. } => {
             assert_eq!(session, "p#1");
             assert_eq!(state, AgentState::Started);
             assert_eq!(tool, "bash");
             assert_eq!(agent_type, "claude");
+            assert_eq!(session_name.as_deref(), Some("Renamed session"));
         }
         other => panic!("expected State, got {other:?}"),
     }
@@ -146,6 +147,7 @@ fn serialize_render() {
             focused: true,
             group: 0,
             agent_type: Arc::from("claude"),
+            session_name: Some("Renamed session".to_string()),
             tool: String::new(),
             awaiting_since_unix: None,
             uncommitted_count: None,
@@ -160,6 +162,7 @@ fn serialize_render() {
     assert_eq!(v["agents"][0]["focused"], true);
     assert_eq!(v["agents"][0]["group"], 0);
     assert_eq!(v["agents"][0]["agent_type"], "claude");
+    assert_eq!(v["agents"][0]["session_name"], "Renamed session");
 }
 
 #[test]

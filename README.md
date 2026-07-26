@@ -62,6 +62,7 @@ cd argus-agenticus
 
 - `jq`
 - `socat` or `netcat`
+- `sqlite3` (optional, for Codex session names)
 - `curl` (for downloading pre-built binary) or [Rust](https://rustup.rs/) toolchain (to build from source)
 - GNOME 49+ with Wayland (for the desktop extension)
 

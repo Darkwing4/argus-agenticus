@@ -112,13 +112,15 @@ async fn state_broadcasts_to_extension() {
     let mut agent = srv.connect().await;
 
     ext.send(r#"{"type":"window_focus","title":"proj - editor"}"#).await;
-    tokio::time::sleep(Duration::from_millis(50)).await;
+    let initial_render = ext.recv().await;
+    assert_eq!(initial_render["type"], "render");
 
-    agent.send(r#"{"type":"state","session":"proj#1","state":"started","tool":"bash"}"#).await;
+    agent.send(r#"{"type":"state","session":"proj#1","state":"started","tool":"bash","session_name":"Renamed session"}"#).await;
 
     let resp = ext.recv().await;
     assert_eq!(resp["type"], "render");
     assert!(resp["agents"].is_array());
+    assert_eq!(resp["agents"][0]["session_name"], "Renamed session");
 
     srv.shutdown().await;
 }

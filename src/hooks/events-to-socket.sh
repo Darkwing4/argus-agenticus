@@ -7,12 +7,13 @@ command -v jq >/dev/null 2>&1 || exit 0
 INPUT=$(timeout 1 cat 2>/dev/null || echo '{}')
 mapfile -d '' -t INPUT_FIELDS < <(
   printf '%s' "$INPUT" |
-    jq -jr '(.hook_event_name // "unknown"), "\u0000", (.tool_name // ""), "\u0000", ((.is_interrupt // false) | tostring), "\u0000", (.cwd // ""), "\u0000"'
+    jq -jr '(.hook_event_name // "unknown"), "\u0000", (.tool_name // ""), "\u0000", ((.is_interrupt // false) | tostring), "\u0000", (.cwd // ""), "\u0000", (.session_id // ""), "\u0000"'
 )
 EVENT="${INPUT_FIELDS[0]:-unknown}"
 TOOL="${INPUT_FIELDS[1]:-}"
 IS_INTERRUPT="${INPUT_FIELDS[2]:-false}"
 CWD="${INPUT_FIELDS[3]:-}"
+SESSION_ID="${INPUT_FIELDS[4]:-}"
 
 LOG="${XDG_RUNTIME_DIR:-/tmp}/argus-agenticus/hook.log"
 
@@ -39,7 +40,6 @@ case "$AGENT_TYPE" in
     fi
     ;;
   codex)
-    SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
     if [ -n "$ZELLIJ_SESSION_NAME" ]; then
         SESSION="${ZELLIJ_SESSION_NAME}#${ZELLIJ_PANE_ID:-0}-cdx"
     else
@@ -88,6 +88,46 @@ case "$EVENT" in
     ;;
 esac
 
+SESSION_NAME=""
+SESSION_NAME_AVAILABLE=false
+case "$EVENT" in
+  SessionStart|UserPromptSubmit)
+    case "$AGENT_TYPE" in
+      claude)
+        CLAUDE_SESSIONS_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions"
+        for CLAUDE_SESSION_FILE in "$CLAUDE_SESSIONS_DIR"/*.json; do
+          [ -r "$CLAUDE_SESSION_FILE" ] || continue
+          CLAUDE_SESSION_RECORD=$(
+            timeout 1 jq -c --arg session_id "$SESSION_ID" \
+              'select(.sessionId == $session_id)' \
+              "$CLAUDE_SESSION_FILE" 2>/dev/null || true
+          )
+          [ -n "$CLAUDE_SESSION_RECORD" ] || continue
+          SESSION_NAME=$(
+            printf '%s' "$CLAUDE_SESSION_RECORD" |
+              jq -r 'if (.nameSource // "") == "derived" then "" else .name // "" end'
+          )
+          SESSION_NAME_AVAILABLE=true
+          break
+        done
+        ;;
+      codex)
+        CODEX_STATE_DB="${CODEX_HOME:-$HOME/.codex}/state_5.sqlite"
+        if [[ "$SESSION_ID" =~ ^[0-9a-fA-F-]{16,64}$ ]] &&
+           [ -r "$CODEX_STATE_DB" ] &&
+           command -v sqlite3 >/dev/null 2>&1; then
+          SESSION_NAME=$(
+            timeout 1 sqlite3 -readonly "$CODEX_STATE_DB" \
+              "SELECT name FROM threads WHERE id = '$SESSION_ID' LIMIT 1;" \
+              2>/dev/null || true
+          )
+          SESSION_NAME_AVAILABLE=true
+        fi
+        ;;
+    esac
+    ;;
+esac
+
 UNCOMMITTED=0
 if [ "$STATE" != "ended" ] && [ -n "$CWD" ]; then
     UNCOMMITTED=$(timeout 1 git -C "$CWD" status --short 2>/dev/null | wc -l | tr -d ' ' 2>/dev/null || echo 0)
@@ -106,9 +146,12 @@ MSG=$(jq -cn \
   --arg state "$STATE" \
   --arg tool "$TOOL" \
   --arg agent_type "$AGENT_TYPE" \
+  --arg session_name "$SESSION_NAME" \
+  --argjson session_name_available "$SESSION_NAME_AVAILABLE" \
   --argjson uncommitted_count "$UNCOMMITTED" \
   --arg multiplexer "$MULTIPLEXER" \
   '{type: "state", session: $session, state: $state, tool: $tool, agent_type: $agent_type, uncommitted_count: $uncommitted_count}
+   + if $session_name_available then {session_name: $session_name} else {} end
    + if $multiplexer == "" then {} else {multiplexer: $multiplexer} end')
 
 [ "${ARGUS_DEBUG:-}" = "1" ] && mkdir -p "$(dirname "$LOG")" && echo "$(date '+%H:%M:%S') $AGENT_TYPE $SESSION $STATE event=$EVENT tool=$TOOL" >> "$LOG" 2>/dev/null

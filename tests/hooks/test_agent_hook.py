@@ -2,8 +2,10 @@ import asyncio
 import json
 import os
 import shutil
+import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 
@@ -36,7 +38,7 @@ class CodexHookConfigTest(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("jq"), "jq is required")
 @unittest.skipUnless(HAS_TRANSPORT, "socat or nc is required")
-class CodexHookFunctionalTest(unittest.IsolatedAsyncioTestCase):
+class AgentHookFunctionalTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.root = Path(self.temp_dir.name)
@@ -45,6 +47,10 @@ class CodexHookFunctionalTest(unittest.IsolatedAsyncioTestCase):
         self.socket_path.parent.mkdir(parents=True)
         self.workspace = self.root / "standalone-project"
         self.workspace.mkdir()
+        self.codex_home = self.root / "codex-home"
+        self.codex_home.mkdir()
+        self.claude_config = self.root / "claude"
+        (self.claude_config / "sessions").mkdir(parents=True)
         self.messages = asyncio.Queue()
         self.connections = set()
         self.server = await asyncio.start_unix_server(
@@ -75,7 +81,13 @@ class CodexHookFunctionalTest(unittest.IsolatedAsyncioTestCase):
             writer.close()
             await writer.wait_closed()
 
-    async def _run_hook(self, event, tool=None, zellij=False):
+    async def _run_hook(
+        self,
+        event,
+        tool=None,
+        zellij=False,
+        agent_type="codex",
+    ):
         payload = {
             "session_id": "0123456789abcdef",
             "cwd": str(self.workspace),
@@ -85,7 +97,9 @@ class CodexHookFunctionalTest(unittest.IsolatedAsyncioTestCase):
             payload["tool_name"] = tool
 
         env = os.environ.copy()
-        env["ARGUS_AGENT_TYPE"] = "codex"
+        env["ARGUS_AGENT_TYPE"] = agent_type
+        env["CLAUDE_CONFIG_DIR"] = str(self.claude_config)
+        env["CODEX_HOME"] = str(self.codex_home)
         env["XDG_RUNTIME_DIR"] = str(self.runtime_dir)
         env.pop("ZELLIJ_SESSION_NAME", None)
         env.pop("ZELLIJ_PANE_ID", None)
@@ -142,6 +156,53 @@ class CodexHookFunctionalTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_zellij_lifecycle_states(self):
         await self._assert_lifecycle(zellij=True)
+
+    async def test_claude_reads_custom_session_name(self):
+        session_file = self.claude_config / "sessions" / "123.json"
+        (self.claude_config / "sessions" / "000-invalid.json").write_text("{")
+        session_file.write_text(
+            json.dumps({
+                "sessionId": "0123456789abcdef",
+                "name": "Renamed session",
+            })
+        )
+
+        message = await self._run_hook(
+            "SessionStart",
+            agent_type="claude",
+        )
+
+        self.assertEqual(message["session_name"], "Renamed session")
+
+        session_file.write_text(
+            json.dumps({
+                "sessionId": "0123456789abcdef",
+                "name": "standalone-project",
+                "nameSource": "derived",
+            })
+        )
+        message = await self._run_hook("UserPromptSubmit", agent_type="claude")
+
+        self.assertEqual(message["session_name"], "")
+
+    @unittest.skipUnless(shutil.which("sqlite3"), "sqlite3 is required")
+    async def test_codex_reads_name_only_on_refresh_events(self):
+        database_path = self.codex_home / "state_5.sqlite"
+        with closing(sqlite3.connect(database_path)) as connection:
+            connection.execute(
+                "CREATE TABLE threads (id TEXT PRIMARY KEY, name TEXT)"
+            )
+            connection.execute(
+                "INSERT INTO threads (id, name) VALUES (?, ?)",
+                ("0123456789abcdef", "Renamed session"),
+            )
+            connection.commit()
+
+        start_message = await self._run_hook("SessionStart")
+        tool_message = await self._run_hook("PreToolUse", tool="Bash")
+
+        self.assertEqual(start_message["session_name"], "Renamed session")
+        self.assertNotIn("session_name", tool_message)
 
 
 if __name__ == "__main__":

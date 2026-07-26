@@ -80,12 +80,14 @@ class ExtView:
         if enter:
             await self._eval(_wrap(
                 f"var _w = _view._renderer._dotWidgets.get('{session}'); "
-                f"if (_w) {{ _view._renderer.showTooltip(_w.button, '{session}'); }} "
+                "if (_w) _w.button.emit('enter-event', null); "
                 "return '';"
             ))
         else:
             await self._eval(_wrap(
-                "_view._renderer.hideTooltip(); return '';"
+                f"var _w = _view._renderer._dotWidgets.get('{session}'); "
+                "if (_w) _w.button.emit('leave-event', null); "
+                "return '';"
             ))
 
     async def tooltip_text(self):

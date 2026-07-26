@@ -20,12 +20,14 @@ pub async fn process(
     state: &Arc<Mutex<StateManager>>,
 ) -> Effects {
     match msg {
-        IncomingMessage::State { session, state: agent_state, tool, agent_type, uncommitted_count, multiplexer } => {
+        IncomingMessage::State { session, state: agent_state, tool, agent_type, session_name, uncommitted_count, multiplexer } => {
             debug!("State: {} -> {:?} ({}) [{}]", session, agent_state, tool, agent_type);
             let agent_type: Arc<str> = agent_type.into();
             let multiplexer: Option<Arc<str>> = multiplexer.map(|m| m.into());
             let mut s = state.lock().await;
+            let session_key = session.clone();
             let event = s.update_state(session, agent_state, tool, agent_type, uncommitted_count, multiplexer);
+            s.set_session_name(&session_key, session_name);
             Effects {
                 reply: None,
                 auto_focus: event,
