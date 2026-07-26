@@ -5,8 +5,14 @@ exec >/dev/null 2>>"$ARGUS_HOOK_LOG"
 trap 'exit 0' EXIT
 command -v jq >/dev/null 2>&1 || exit 0
 INPUT=$(timeout 1 cat 2>/dev/null || echo '{}')
-read -r EVENT TOOL IS_INTERRUPT <<< $(echo "$INPUT" | jq -r '[.hook_event_name // "unknown", .tool_name // "", .is_interrupt // false] | @tsv')
-CWD=$(echo "$INPUT" | jq -r '.cwd // ""')
+mapfile -d '' -t INPUT_FIELDS < <(
+  printf '%s' "$INPUT" |
+    jq -jr '(.hook_event_name // "unknown"), "\u0000", (.tool_name // ""), "\u0000", ((.is_interrupt // false) | tostring), "\u0000", (.cwd // ""), "\u0000"'
+)
+EVENT="${INPUT_FIELDS[0]:-unknown}"
+TOOL="${INPUT_FIELDS[1]:-}"
+IS_INTERRUPT="${INPUT_FIELDS[2]:-false}"
+CWD="${INPUT_FIELDS[3]:-}"
 
 LOG="${XDG_RUNTIME_DIR:-/tmp}/argus-agenticus/hook.log"
 
@@ -59,11 +65,6 @@ esac
 if [ -z "$CWD" ] && [ -n "$WORKSPACE" ]; then
     CWD="$WORKSPACE"
 fi
-UNCOMMITTED=0
-if [ -n "$CWD" ]; then
-    UNCOMMITTED=$(timeout 1 git -C "$CWD" status --short 2>/dev/null | wc -l | tr -d ' ' 2>/dev/null || echo 0)
-    [[ "$UNCOMMITTED" =~ ^[0-9]+$ ]] || UNCOMMITTED=0
-fi
 
 case "$EVENT" in
   SessionStart|sessionStart)                          STATE="started" ;;
@@ -87,19 +88,33 @@ case "$EVENT" in
     ;;
 esac
 
+UNCOMMITTED=0
+if [ "$STATE" != "ended" ] && [ -n "$CWD" ]; then
+    UNCOMMITTED=$(timeout 1 git -C "$CWD" status --short 2>/dev/null | wc -l | tr -d ' ' 2>/dev/null || echo 0)
+    [[ "$UNCOMMITTED" =~ ^[0-9]+$ ]] || UNCOMMITTED=0
+fi
+
 if [ -z "$ZELLIJ_SESSION_NAME" ]; then
     { printf '\033]0;Argus (%s)\a' "$SESSION" > /dev/tty; } 2>/dev/null || true
 fi
 
 SOCK="${XDG_RUNTIME_DIR:-/tmp}/agents-monitor/daemon.sock"
-MUX=""
-[ -n "$ZELLIJ_SESSION_NAME" ] && MUX=",\"multiplexer\":\"zellij\""
-MSG="{\"type\":\"state\",\"session\":\"$SESSION\",\"state\":\"$STATE\",\"tool\":\"$TOOL\",\"agent_type\":\"$AGENT_TYPE\",\"uncommitted_count\":$UNCOMMITTED${MUX}}"
+MULTIPLEXER=""
+[ -n "$ZELLIJ_SESSION_NAME" ] && MULTIPLEXER="zellij"
+MSG=$(jq -cn \
+  --arg session "$SESSION" \
+  --arg state "$STATE" \
+  --arg tool "$TOOL" \
+  --arg agent_type "$AGENT_TYPE" \
+  --argjson uncommitted_count "$UNCOMMITTED" \
+  --arg multiplexer "$MULTIPLEXER" \
+  '{type: "state", session: $session, state: $state, tool: $tool, agent_type: $agent_type, uncommitted_count: $uncommitted_count}
+   + if $multiplexer == "" then {} else {multiplexer: $multiplexer} end')
 
 [ "${ARGUS_DEBUG:-}" = "1" ] && mkdir -p "$(dirname "$LOG")" && echo "$(date '+%H:%M:%S') $AGENT_TYPE $SESSION $STATE event=$EVENT tool=$TOOL" >> "$LOG" 2>/dev/null
 
 if command -v socat >/dev/null 2>&1; then
-  echo "$MSG" | timeout 2 socat - "UNIX-CONNECT:$SOCK" 2>/dev/null || true
+  printf '%s\n' "$MSG" | timeout 2 socat - "UNIX-CONNECT:$SOCK" 2>/dev/null || true
 elif command -v nc >/dev/null 2>&1; then
-  echo "$MSG" | timeout 2 nc -U "$SOCK" 2>/dev/null || true
+  printf '%s\n' "$MSG" | timeout 2 nc -U "$SOCK" 2>/dev/null || true
 fi

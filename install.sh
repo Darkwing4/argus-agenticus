@@ -141,26 +141,49 @@ if [ -d "$HOME/.codex" ]; then
     info "Configuring Codex hooks..."
     CODEX_HOOKS="$HOME/.codex/hooks.json"
     CODEX_CMD="ARGUS_AGENT_TYPE=codex $HOOK_CMD"
+    if [ -L "$CODEX_HOOKS" ] && [ ! -e "$CODEX_HOOKS" ]; then
+        rm "$CODEX_HOOKS"
+    fi
     if [ ! -f "$CODEX_HOOKS" ]; then
         echo '{"hooks": {}}' > "$CODEX_HOOKS"
     fi
 
-    CODEX_EVENTS='["SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","PermissionRequest","Stop","SubagentStart","SubagentStop"]'
-
     TMP_CODEX=$(mktemp)
     cp "$CODEX_HOOKS" "$TMP_CODEX"
 
-    for EVENT in $(echo "$CODEX_EVENTS" | jq -r '.[]'); do
-        ALREADY=$(jq -r --arg e "$EVENT" --arg cmd "$CODEX_CMD" \
-            '.hooks[$e] // [] | map(select(.hooks[]?.command == $cmd)) | length' \
-            "$TMP_CODEX" 2>/dev/null || echo "0")
-
-        if [ "$ALREADY" = "0" ]; then
-            jq --arg e "$EVENT" --arg cmd "$CODEX_CMD" \
-                '.hooks[$e] = (.hooks[$e] // []) + [{"hooks": [{"type": "command", "command": $cmd}]}]' \
-                "$TMP_CODEX" > "${TMP_CODEX}.new" && mv "${TMP_CODEX}.new" "$TMP_CODEX"
-        fi
-    done
+    jq --arg cmd "$CODEX_CMD" '
+        def remove_command:
+            map(
+                if ((.hooks? | type) == "array") then
+                    .hooks = [.hooks[] | select(.command? != $cmd)]
+                else
+                    .
+                end
+            )
+            | map(select(((.hooks? | type) != "array") or ((.hooks | length) > 0)));
+        def command_hook:
+            {"type": "command", "command": $cmd};
+        def command_group:
+            {"hooks": [command_hook]};
+        .hooks = (.hooks // {})
+        | reduce ["UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Stop"][] as $event (
+            .;
+            .hooks[$event] = (((.hooks[$event] // []) | remove_command) + [command_group])
+        )
+        | .hooks.SessionStart = (
+            ((.hooks.SessionStart // []) | remove_command)
+            + [{"matcher": "startup|resume|clear", "hooks": [command_hook]}]
+        )
+        | .hooks.SessionEnd = (
+            ((.hooks.SessionEnd // []) | remove_command)
+            + [{"hooks": [command_hook + {"timeout": 3}]}]
+        )
+        | .hooks.SubagentStart = ((.hooks.SubagentStart // []) | remove_command)
+        | .hooks.SubagentStop = ((.hooks.SubagentStop // []) | remove_command)
+        | if (.hooks.SubagentStart | length) == 0 then del(.hooks.SubagentStart) else . end
+        | if (.hooks.SubagentStop | length) == 0 then del(.hooks.SubagentStop) else . end
+    ' "$TMP_CODEX" > "${TMP_CODEX}.new"
+    mv "${TMP_CODEX}.new" "$TMP_CODEX"
 
     mv "$TMP_CODEX" "$CODEX_HOOKS"
 fi
@@ -202,6 +225,7 @@ echo "  Claude hooks:    ~/.claude/settings.json"
 [ -d "$HOME/.cursor" ] && echo "  Cursor hooks:    ~/.cursor/hooks.json"
 [ -d "$HOME/.codex" ] && echo "  Codex hooks:     ~/.codex/hooks.json"
 echo "  Systemd service: ~/.config/systemd/user/argus-agenticus.service"
+[ -d "$HOME/.codex" ] && warn "Codex: start Codex, open /hooks, and review/trust the Argus handlers."
 if [ "$GNOME_INSTALLED" = true ]; then
     echo "  GNOME extension: installed"
     echo ""

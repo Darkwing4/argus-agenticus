@@ -19,6 +19,7 @@ Special case: `PostToolUseFailure` with `is_interrupt=true` → `completed`.
 |------|-----------|-----------|----------------|
 | `claude` | Ptyxis, org.gnome.Ptyxis | Circle | `zellij_session#pane_id` or `name#sSID` |
 | `cursor` | Cursor | Square | `zellij_session#c-conv_id` or `name#c-conv_id` |
+| `codex` | Ptyxis, org.gnome.Ptyxis | Circle with purple border | `zellij_session#pane_id-cdx` or `name#cdx-session_id` |
 
 Adding a new agent type (Windsurf, Codex, etc.) requires:
 
@@ -87,7 +88,7 @@ Automatically focuses agent windows waiting for permission when the user is idle
 
 Single hook script `events-to-socket.sh` handles all lifecycle events for Claude Code, Cursor CLI and Codex CLI.
 
-Supported events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `Stop`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `beforeShellExecution`, `afterShellExecution`, `beforeMCPExecution`, `afterMCPExecution`, `beforeSubmitPrompt`.
+Supported events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `Stop`, `SessionEnd`, `beforeShellExecution`, `afterShellExecution`, `beforeMCPExecution`, `afterMCPExecution`, `beforeSubmitPrompt`.
 
 Agent type resolved from `ARGUS_AGENT_TYPE` env var (set by `~/.codex/hooks.json` to `codex`), then by presence of `cursor_version` in payload, defaulting to `claude`.
 

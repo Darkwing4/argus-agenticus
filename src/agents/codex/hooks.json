@@ -2,6 +2,7 @@
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "startup|resume|clear",
         "hooks": [
           {
             "type": "command",
@@ -60,22 +61,13 @@
         ]
       }
     ],
-    "SubagentStart": [
+    "SessionEnd": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "ARGUS_AGENT_TYPE=codex bash ~/.claude/hooks/events-to-socket.sh"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "ARGUS_AGENT_TYPE=codex bash ~/.claude/hooks/events-to-socket.sh"
+            "command": "ARGUS_AGENT_TYPE=codex bash ~/.claude/hooks/events-to-socket.sh",
+            "timeout": 3
           }
         ]
       }

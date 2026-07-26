@@ -8,6 +8,7 @@ pub fn parse_zellij_target(session: &str) -> Option<(&str, u32)> {
     if pane_str.starts_with('s') || pane_str.starts_with("c-") {
         return None;
     }
+    let pane_str = pane_str.strip_suffix("-cdx").unwrap_or(pane_str);
     let pane_id = pane_str.parse::<u32>().ok()?;
     Some((zellij_session, pane_id))
 }

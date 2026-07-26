@@ -244,6 +244,12 @@ fn parse_zellij_target_valid() {
 }
 
 #[test]
+fn parse_zellij_target_codex() {
+    let result = zellij::parse_zellij_target("mysession#42-cdx");
+    assert_eq!(result, Some(("mysession", 42)));
+}
+
+#[test]
 fn parse_zellij_target_standalone() {
     assert_eq!(zellij::parse_zellij_target("project#s1234"), None);
 }

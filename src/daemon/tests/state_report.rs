@@ -110,8 +110,9 @@ fn test_update_window_focus() -> bool {
     let mut sm = StateManager::new();
     sm.update_state(s("proj#1"), AgentState::Completed, s("bash"), a("claude"), None, None);
 
-    let changed = sm.update_window_focus("proj - editor", None);
+    let (changed, event) = sm.update_window_focus("proj - editor", None);
     assert!(changed);
+    assert_eq!(event, AutoFocusEvent::None);
 
     let data = sm.get_render_data();
     assert_eq!(data[0].state, AgentState::Started);
@@ -331,8 +332,9 @@ fn test_cursor_window_focus_by_title() -> bool {
     let mut sm = StateManager::new();
     sm.update_state(s("myproj#c-abc12345"), AgentState::Completed, s("Shell"), a("cursor"), None, None);
 
-    let changed = sm.update_window_focus("file.ts - myproj - Cursor", None);
+    let (changed, event) = sm.update_window_focus("file.ts - myproj - Cursor", None);
     assert!(changed);
+    assert_eq!(event, AutoFocusEvent::None);
 
     let data = sm.get_render_data();
     assert_eq!(data[0].state, AgentState::Started);
@@ -344,8 +346,9 @@ fn test_cursor_window_focus_by_agent_type() -> bool {
     let mut sm = StateManager::new();
     sm.update_state(s("cursor#c-abc12345"), AgentState::Completed, s("Shell"), a("cursor"), None, None);
 
-    let changed = sm.update_window_focus("file.ts - SomeProject - Cursor", Some("cursor"));
+    let (changed, event) = sm.update_window_focus("file.ts - SomeProject - Cursor", Some("cursor"));
     assert!(changed);
+    assert_eq!(event, AutoFocusEvent::None);
 
     let data = sm.get_render_data();
     assert_eq!(data[0].state, AgentState::Started);
@@ -394,6 +397,36 @@ fn test_stale_claude_started_not_removed() -> bool {
     let changed = sm.cleanup_ended();
     assert!(!changed);
     assert_eq!(sm.get_render_data().len(), 1);
+    true
+}
+
+fn test_stale_codex_started_not_removed() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("proj#42-cdx"), AgentState::Started, s("Shell"), a("codex"), None, None);
+
+    sm.force_stale_session("proj#42-cdx");
+
+    let changed = sm.cleanup_ended();
+    assert!(!changed);
+    let data = sm.get_render_data();
+    assert_eq!(data.len(), 1);
+    assert_eq!(data[0].state, AgentState::Started);
+    assert_eq!(&*data[0].agent_type, "codex");
+    true
+}
+
+fn test_codex_window_focus_by_title() -> bool {
+    let mut sm = StateManager::new();
+    sm.update_state(s("myproj#42-cdx"), AgentState::Completed, s("Shell"), a("codex"), None, None);
+
+    let (changed, event) = sm.update_window_focus("myproj - Zellij", Some("claude"));
+    assert!(changed);
+    assert_eq!(event, AutoFocusEvent::None);
+
+    let data = sm.get_render_data();
+    assert_eq!(data[0].state, AgentState::Started);
+    assert!(data[0].focused);
+    assert_eq!(&*data[0].agent_type, "codex");
     true
 }
 
@@ -538,6 +571,8 @@ fn full_report() {
         ("get_agent_type", test_get_agent_type),
         ("stale_cursor_started_becomes_ended", test_stale_cursor_started_becomes_ended),
         ("stale_claude_started_not_removed", test_stale_claude_started_not_removed),
+        ("stale_codex_started_not_removed", test_stale_codex_started_not_removed),
+        ("codex_window_focus_by_title", test_codex_window_focus_by_title),
         ("stale_cursor_completed_not_removed", test_stale_cursor_completed_not_removed),
         ("stale_cursor_focused_not_removed", test_stale_cursor_focused_not_removed),
         ("stale_cursor_activity_resets_timer", test_stale_cursor_activity_resets_timer),

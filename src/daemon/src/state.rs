@@ -336,7 +336,7 @@ impl StateManager {
 
         for (session, info) in self.sessions.iter_mut() {
             if info.ended_at.is_none()
-                && &*info.agent_type != "claude"
+                && &*info.agent_type == "cursor"
                 && info.state == AgentState::Started
                 && now.duration_since(info.last_activity) >= STALE_TIMEOUT
                 && self.focused_group.as_deref() != Some(Self::get_group(session))

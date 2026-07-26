@@ -149,6 +149,7 @@ fn serialize_render() {
             tool: String::new(),
             awaiting_since_unix: None,
             uncommitted_count: None,
+            auto_focus_mode: 0,
         }],
     };
     let json = serde_json::to_string(&msg).unwrap();

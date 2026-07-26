@@ -267,6 +267,31 @@ async fn click_returns_agent_type() {
 }
 
 #[tokio::test]
+async fn codex_agent_type_survives_render_and_click() {
+    let srv = TestServer::start("codex_agent_type").await;
+    let mut ext = srv.connect().await;
+    let mut agent = srv.connect().await;
+
+    ext.send(r#"{"type":"window_focus","title":""}"#).await;
+    let initial_render = ext.recv().await;
+    assert_eq!(initial_render["type"], "render");
+
+    agent.send(r#"{"type":"state","session":"proj#cdx-abc12345","state":"started","tool":"Shell","agent_type":"codex"}"#).await;
+    let render = ext.recv().await;
+    assert_eq!(render["type"], "render");
+    assert_eq!(render["agents"][0]["session"], "proj#cdx-abc12345");
+    assert_eq!(render["agents"][0]["agent_type"], "codex");
+
+    ext.send(r#"{"type":"click","session":"proj#cdx-abc12345"}"#).await;
+    let focus = ext.recv().await;
+    assert_eq!(focus["type"], "focus");
+    assert_eq!(focus["session"], "proj#cdx-abc12345");
+    assert_eq!(focus["agent_type"], "codex");
+
+    srv.shutdown().await;
+}
+
+#[tokio::test]
 async fn repeated_click_same_session() {
     let srv = TestServer::start("repeated_click").await;
     let mut c = srv.connect().await;
