@@ -104,7 +104,7 @@ export class WindowTracker {
         if (match)
             return match[1];
 
-        logError(new Error(`extractSessionKey: no pattern matched "${title}"`));
+        log(`extractSessionKey: no pattern matched "${title}"`);
 
         return null;
     }

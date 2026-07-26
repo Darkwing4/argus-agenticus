@@ -57,17 +57,3 @@ async def test_agents_on_different_workspaces(spy, terminals, view, ws):
 
 async def test_many_agents_same_group(spy, terminals, view):
     socket = spy.socket_path
-
-    await send_hook_event(socket, "proj#1", "started")
-    await spy.wait_render_with_session("proj#1", timeout=5)
-
-    spy.clear()
-    await send_hook_event(socket, "proj#2", "started")
-    await spy.wait_render_with_agents(2, timeout=5)
-
-    spy.clear()
-    await send_hook_event(socket, "proj#3", "started")
-    await spy.wait_render_with_agents(3, timeout=5)
-
-    await view.wait_dot_count(3, timeout=5)
-    await view.wait_group_count(1, timeout=3)

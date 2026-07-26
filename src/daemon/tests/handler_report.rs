@@ -2,6 +2,7 @@ mod common;
 
 use argus_agenticus::handler;
 use argus_agenticus::protocol::{AgentState, IncomingMessage};
+use argus_agenticus::zellij;
 
 use common::*;
 
@@ -210,4 +211,54 @@ async fn scenario_full_lifecycle() {
     let data = state.lock().await.get_render_data();
     assert_eq!(data.len(), 1);
     assert_eq!(data[0].state, AgentState::Ended);
+}
+
+#[tokio::test]
+async fn click_zellij_session_has_multiplexer() {
+    let state = fresh_state();
+    handler::process(msg_state_zellij("mysession#3", AgentState::Started), &state).await;
+    let fx = handler::process(msg_click("mysession#3"), &state).await;
+    should_reply_focus_with_multiplexer(&fx, "mysession#3", Some("zellij"));
+}
+
+#[tokio::test]
+async fn click_standalone_no_multiplexer() {
+    let state = fresh_state();
+    handler::process(msg_state("project#s1234", AgentState::Started), &state).await;
+    let fx = handler::process(msg_click("project#s1234"), &state).await;
+    should_reply_focus_with_multiplexer(&fx, "project#s1234", None);
+}
+
+#[tokio::test]
+async fn focus_next_zellij_has_multiplexer() {
+    let state = fresh_state();
+    handler::process(msg_state_zellij("zs#5", AgentState::Awaiting), &state).await;
+    let fx = handler::process(msg_focus_next(), &state).await;
+    should_reply_focus_with_multiplexer(&fx, "zs#5", Some("zellij"));
+}
+
+#[test]
+fn parse_zellij_target_valid() {
+    let result = zellij::parse_zellij_target("mysession#42");
+    assert_eq!(result, Some(("mysession", 42)));
+}
+
+#[test]
+fn parse_zellij_target_standalone() {
+    assert_eq!(zellij::parse_zellij_target("project#s1234"), None);
+}
+
+#[test]
+fn parse_zellij_target_cursor() {
+    assert_eq!(zellij::parse_zellij_target("project#c-abcdef12"), None);
+}
+
+#[test]
+fn parse_zellij_target_no_hash() {
+    assert_eq!(zellij::parse_zellij_target("noseparator"), None);
+}
+
+#[test]
+fn parse_zellij_target_non_numeric() {
+    assert_eq!(zellij::parse_zellij_target("session#abc"), None);
 }

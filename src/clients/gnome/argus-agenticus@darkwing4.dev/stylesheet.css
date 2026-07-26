@@ -8,6 +8,10 @@
     border-radius: 3px;
 }
 
+.agent-dot-codex {
+    border: 1px solid #9b59b6;
+}
+
 .agent-dot-started {
     background-color: #2ecc71;
 }
@@ -43,9 +47,12 @@
 }
 
 .agent-group-label {
-    font-size: 11px;
     color: rgba(255, 255, 255, 0.7);
-    margin-right: 4px;
+}
+
+.agent-dot-af-label {
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.95);
 }
 
 .argus-logo {
@@ -67,4 +74,18 @@
 
 .auto-focus-button.auto-focus-enabled {
     color: #e74c3c;
+}
+
+.agent-group-af-button {
+    color: rgba(255, 255, 255, 0.35);
+    font-weight: 900;
+}
+
+.agent-group-af-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.agent-group-af-button.agent-group-af-button-on {
+    color: rgba(255, 255, 255, 0.95);
 }

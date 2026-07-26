@@ -7,7 +7,7 @@ fn deserialize_state() {
     let json = r#"{"type":"state","session":"p#1","state":"started","tool":"bash","agent_type":"claude"}"#;
     let msg: IncomingMessage = serde_json::from_str(json).unwrap();
     match msg {
-        IncomingMessage::State { session, state, tool, agent_type } => {
+        IncomingMessage::State { session, state, tool, agent_type, .. } => {
             assert_eq!(session, "p#1");
             assert_eq!(state, AgentState::Started);
             assert_eq!(tool, "bash");
@@ -146,6 +146,9 @@ fn serialize_render() {
             focused: true,
             group: 0,
             agent_type: Arc::from("claude"),
+            tool: String::new(),
+            awaiting_since_unix: None,
+            uncommitted_count: None,
         }],
     };
     let json = serde_json::to_string(&msg).unwrap();
@@ -160,22 +163,59 @@ fn serialize_render() {
 
 #[test]
 fn serialize_focus() {
-    let msg = OutgoingMessage::Focus { session: "proj#1".to_string(), agent_type: "claude".to_string() };
+    let msg = OutgoingMessage::Focus { session: "proj#1".to_string(), agent_type: "claude".to_string(), multiplexer: None };
     let json = serde_json::to_string(&msg).unwrap();
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["type"], "focus");
     assert_eq!(v["session"], "proj#1");
     assert_eq!(v["agent_type"], "claude");
+    assert!(v.get("multiplexer").is_none(), "multiplexer should be absent when None");
+}
+
+#[test]
+fn serialize_focus_with_multiplexer() {
+    let msg = OutgoingMessage::Focus { session: "zs#3".to_string(), agent_type: "claude".to_string(), multiplexer: Some("zellij".to_string()) };
+    let json = serde_json::to_string(&msg).unwrap();
+    let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["type"], "focus");
+    assert_eq!(v["session"], "zs#3");
+    assert_eq!(v["multiplexer"], "zellij");
 }
 
 #[test]
 fn serialize_auto_focus() {
-    let msg = OutgoingMessage::AutoFocus { session: "proj#1".to_string(), agent_type: "claude".to_string() };
+    let msg = OutgoingMessage::AutoFocus { session: "proj#1".to_string(), agent_type: "claude".to_string(), multiplexer: None };
     let json = serde_json::to_string(&msg).unwrap();
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["type"], "auto_focus");
     assert_eq!(v["session"], "proj#1");
     assert_eq!(v["agent_type"], "claude");
+    assert!(v.get("multiplexer").is_none(), "multiplexer should be absent when None");
+}
+
+#[test]
+fn deserialize_state_with_multiplexer() {
+    let json = r#"{"type":"state","session":"zs#3","state":"started","tool":"bash","agent_type":"claude","multiplexer":"zellij"}"#;
+    let msg: IncomingMessage = serde_json::from_str(json).unwrap();
+    match msg {
+        IncomingMessage::State { session, multiplexer, .. } => {
+            assert_eq!(session, "zs#3");
+            assert_eq!(multiplexer, Some("zellij".to_string()));
+        }
+        other => panic!("expected State, got {other:?}"),
+    }
+}
+
+#[test]
+fn deserialize_state_without_multiplexer() {
+    let json = r#"{"type":"state","session":"p#1","state":"started","tool":"bash"}"#;
+    let msg: IncomingMessage = serde_json::from_str(json).unwrap();
+    match msg {
+        IncomingMessage::State { multiplexer, .. } => {
+            assert_eq!(multiplexer, None);
+        }
+        other => panic!("expected State, got {other:?}"),
+    }
 }
 
 #[test]

@@ -1,4 +1,40 @@
+import pytest
 from conftest import agent
+
+TITLE_MATCH_PREAMBLE = (
+    "var _M = await import('resource:///org/gnome/shell/ui/main.js'); "
+    "var _ext = _M.extensionManager.lookup('argus-agenticus@darkwing4.dev'); "
+    "var { _titleMatchesGroup } = "
+    "await import('file://' + _ext.path + '/focusManager.js'); "
+)
+
+
+def _match_js(title, group):
+    t = title.replace("'", "\\'")
+    g = group.replace("'", "\\'")
+    return (
+        f"(async () => {{ {TITLE_MATCH_PREAMBLE}"
+        f"return _titleMatchesGroup('{t}', '{g}'); }})()"
+    )
+
+
+@pytest.mark.parametrize("title,group,expected", [
+    ("escape", "escape", True),
+    ("escape-local", "escape-local", True),
+    ("escape-local", "escape", False),
+    ("escape", "escape-local", False),
+    ("FishIdle2.Unity", "FishIdle2.Unity", True),
+    ("FishIdle2.Unity", "FishIdle2", False),
+    ("Project: escape — bash", "escape", True),
+    ("Project: escape-local — bash", "escape", False),
+    ("", "escape", False),
+])
+async def test_title_matches_group(view, title, group, expected):
+    result = await view.raw(_match_js(title, group))
+    assert result == expected, (
+        f"_titleMatchesGroup({title!r}, {group!r}): "
+        f"expected {expected}, got {result}"
+    )
 
 
 async def test_focus_unmapped_session(ext, view):

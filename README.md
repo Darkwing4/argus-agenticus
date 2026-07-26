@@ -7,6 +7,7 @@ Monitor and manage multiple AI coding agents from your desktop panel.
 ![Rust](https://img.shields.io/badge/Daemon-Rust-orange)
 ![Claude Code](https://img.shields.io/badge/Claude_Code-supported-green)
 ![Cursor](https://img.shields.io/badge/Cursor_CLI-supported-green)
+![Codex](https://img.shields.io/badge/Codex_CLI-supported-green)
 
 https://github.com/user-attachments/assets/a2057241-5a37-4e31-9132-1449730b53d7
 
@@ -28,7 +29,7 @@ Every running cli-agent gets a colored indicator in your desktop panel:
 | 🟢 Green | `started` | Idle, no active task |
 | 🔴 Red | `awaiting` | Needs permission or approval — don't forget about it |
 | 🟡 Yellow | `working` | Agent is busy, everything is fine |
-| 🔵 Blue | `completed` | Task finished, terminal not yet opened — "Unread" |
+| 🔵 Blue | `completed` | Task finished, terminal not yet focused — "Unread" |
 
 ## Features
 
@@ -36,8 +37,10 @@ Every running cli-agent gets a colored indicator in your desktop panel:
 - **Easy navigation**
   - Hover over an indicator to see the agent's name, project, and tab number in multiplexer (if used)
   - **Super+F2** — cycle to the next agent, sorted by priority: 🔴 → 🔵 → 🟢 → 🟡
+  - **Super+F1** — return to previous focused window after focusing any agent
 - **Auto-focus on 🔴** — Argus automatically switches your screen (when idle) to each agent that needs attention, and returns you back when no 🔴 agents remain
 - **Visual grouping** — agents are grouped by physical monitors and workspaces
+- **Customizable** — dot size, gap, font size, panel position (left/center/right), labels via `dconf`
 
 ## Installation
 
@@ -62,7 +65,7 @@ cd argus-agenticus
 - `curl` (for downloading pre-built binary) or [Rust](https://rustup.rs/) toolchain (to build from source)
 - GNOME 49+ with Wayland (for the desktop extension)
 
-The installer downloads a pre-built binary from GitHub Releases (x86_64 / aarch64). If that fails, it falls back to building from source with `cargo`. It also configures agent hooks for Claude Code (and Cursor if installed), sets up the systemd service, and installs the GNOME extension.
+The installer downloads a pre-built binary from GitHub Releases (x86_64 / aarch64). If that fails, it falls back to building from source with `cargo`. It also configures agent hooks for Claude Code (and Cursor / Codex if installed), sets up the systemd service, and installs the GNOME extension.
 
 ## Supported Agents
 
@@ -70,6 +73,7 @@ The installer downloads a pre-built binary from GitHub Releases (x86_64 / aarch6
 |-------|-----------|------|
 | Claude Code | Circle | [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code) |
 | Cursor Agent (CLI) | Square | [cursor.com](https://www.cursor.com/) |
+| Codex CLI (0.133+) | Circle with purple border | [github.com/openai/codex](https://github.com/openai/codex) |
 
 ## Compatibility
 
@@ -78,40 +82,5 @@ The installer downloads a pre-built binary from GitHub Releases (x86_64 / aarch6
 | OS | Status |
 |----|--------|
 | Linux (Wayland, GNOME 49+) | Supported |
-| macOS 14+ | Coming soon |
-| Windows 11 (WSL + WinUI) | In progress |
-
-### Terminal Multiplexers
-
-| Multiplexer | Status |
-|-------------|--------|
-| [Zellij](https://zellij.dev/) | Supported |
-| Tmux | Planned |
-
-Other multiplexers will be supported in the future.
-
-### Terminals
-
-Most popular terminals are recognized out of the box (Ptyxis, Alacritty, Kitty, WezTerm, Foot, GNOME Terminal, Tilix, BlackBox). To add or change the list:
-
-```bash
-dconf write /org/gnome/shell/extensions/argus-agenticus/terminal-wm-classes "['Ptyxis', 'Ghostty']"
-```
-
-## Why "Argus Agenticus"?
-
-**Argus Panoptes** (Ancient Greek: Ἄργος Πανόπτης — "all-seeing") was a hundred-eyed giant from Greek mythology, appointed by Hera to watch over Io. Some of his eyes were always awake while the others slept — the perfect guardian who never misses a thing. **Agenticus** — because he watches not nymphs, but AI agents; the Latin suffix *-icus* means "related to / belonging to."
-
-Thus was born **Argus Agenticus** — the watcher of agents.
-
-## Architecture
-
-Argus is built as a clean pipeline where each layer has a single job:
-
-```
-Agent hooks → shell script → Unix socket → Daemon (Rust) → Unix socket → Desktop Extension
-```
-
-**Agent hooks** fire on lifecycle events (session start, permission request, tool use, stop) and send a short message through a **shell script** to the **daemon** over a Unix socket. The daemon — written in Rust — owns all the business logic: it tracks agent states, groups and sorts them, manages the auto-focus queue, and pushes render-ready data to connected clients. The **desktop extension** (GNOME JS / macOS Swift) is a pure view: it receives pre-sorted data, draws the indicators, detects user idle, and handles window focus.
-
-Agent type is just a string that flows through the entire chain — the daemon has zero type-specific logic, making it trivial to add new agents.
+| macOS 14+ | Planned |
+| Windows 11 (WSL + WinUI) | Planned |

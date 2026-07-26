@@ -48,7 +48,7 @@ class ExtView:
 
     async def is_visible(self):
         val = await self._eval(_wrap(
-            "return _view.visible;"
+            "return _view._groupsBox.visible;"
         ))
         return bool(val)
 

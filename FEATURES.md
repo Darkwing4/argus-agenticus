@@ -40,7 +40,7 @@ Adding a new agent type (Windsurf, Codex, etc.) requires:
 
 - Click on a dot — switch to workspace and focus the agent window
 - Works across workspaces and monitors
-- Claude: matched by terminal title (Zellij session name)
+- Claude, Codex: matched by terminal title (Zellij session name)
 - Cursor: matched by WM class
 
 ## Keyboard Shortcuts
@@ -78,18 +78,18 @@ Automatically focuses agent windows waiting for permission when the user is idle
 
 ## Session Identification
 
-- Zellij: `SESSION#pane_id` (Claude) or `SESSION#c-conv_id` (Cursor)
-- Standalone with git: `repo_name#sSID` (Claude) or `repo_name#c-conv_id` (Cursor)
+- Zellij: `SESSION#pane_id` (Claude), `SESSION#pane_id-cdx` (Codex) or `SESSION#c-conv_id` (Cursor)
+- Standalone with git: `repo_name#sSID` (Claude), `repo_name#cdx-session_id` (Codex) or `repo_name#c-conv_id` (Cursor)
 - Fallback: `standalone#0` (Claude) or `cursor#conv_id` (Cursor)
 - Terminal title set to `Argus (session_id)` for non-Zellij standalone agents
 
 ## Hook System
 
-Single hook script `events-to-socket.sh` handles all lifecycle events for both Claude Code and Cursor CLI.
+Single hook script `events-to-socket.sh` handles all lifecycle events for Claude Code, Cursor CLI and Codex CLI.
 
-Supported events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `Stop`, `SessionEnd`, `beforeShellExecution`, `afterShellExecution`, `beforeMCPExecution`, `afterMCPExecution`, `beforeSubmitPrompt`.
+Supported events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `Stop`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `beforeShellExecution`, `afterShellExecution`, `beforeMCPExecution`, `afterMCPExecution`, `beforeSubmitPrompt`.
 
-Agent type auto-detected by presence of `cursor_version` in hook payload.
+Agent type resolved from `ARGUS_AGENT_TYPE` env var (set by `~/.codex/hooks.json` to `codex`), then by presence of `cursor_version` in payload, defaulting to `claude`.
 
 Message delivery: JSON via Unix socket using `socat` (preferred) or `nc` fallback.
 

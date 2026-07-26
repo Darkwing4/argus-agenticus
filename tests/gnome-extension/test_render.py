@@ -52,6 +52,11 @@ async def test_dot_type_class_cursor(ext, view):
     await view.wait_dot_class("cur#1", "agent-dot-cursor")
 
 
+async def test_dot_type_class_codex(ext, view):
+    await ext.render([agent(session="cdx#1", agent_type="codex", group="cdx")])
+    await view.wait_dot_class("cdx#1", "agent-dot-codex")
+
+
 async def test_group_separation(ext, view):
     agents = [
         agent("a#1", group="a"),

@@ -137,6 +137,34 @@ if [ -d "$HOME/.cursor" ]; then
     mv "$TMP_CURSOR" "$CURSOR_HOOKS"
 fi
 
+if [ -d "$HOME/.codex" ]; then
+    info "Configuring Codex hooks..."
+    CODEX_HOOKS="$HOME/.codex/hooks.json"
+    CODEX_CMD="ARGUS_AGENT_TYPE=codex $HOOK_CMD"
+    if [ ! -f "$CODEX_HOOKS" ]; then
+        echo '{"hooks": {}}' > "$CODEX_HOOKS"
+    fi
+
+    CODEX_EVENTS='["SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","PermissionRequest","Stop","SubagentStart","SubagentStop"]'
+
+    TMP_CODEX=$(mktemp)
+    cp "$CODEX_HOOKS" "$TMP_CODEX"
+
+    for EVENT in $(echo "$CODEX_EVENTS" | jq -r '.[]'); do
+        ALREADY=$(jq -r --arg e "$EVENT" --arg cmd "$CODEX_CMD" \
+            '.hooks[$e] // [] | map(select(.hooks[]?.command == $cmd)) | length' \
+            "$TMP_CODEX" 2>/dev/null || echo "0")
+
+        if [ "$ALREADY" = "0" ]; then
+            jq --arg e "$EVENT" --arg cmd "$CODEX_CMD" \
+                '.hooks[$e] = (.hooks[$e] // []) + [{"hooks": [{"type": "command", "command": $cmd}]}]' \
+                "$TMP_CODEX" > "${TMP_CODEX}.new" && mv "${TMP_CODEX}.new" "$TMP_CODEX"
+        fi
+    done
+
+    mv "$TMP_CODEX" "$CODEX_HOOKS"
+fi
+
 info "Installing systemd service..."
 mkdir -p ~/.config/systemd/user
 cp "$REPO_DIR/src/service/argus-agenticus.service" ~/.config/systemd/user/
@@ -172,6 +200,7 @@ echo "  Daemon:          ~/.local/bin/argus-agenticus"
 echo "  Hook script:     ~/.claude/hooks/events-to-socket.sh"
 echo "  Claude hooks:    ~/.claude/settings.json"
 [ -d "$HOME/.cursor" ] && echo "  Cursor hooks:    ~/.cursor/hooks.json"
+[ -d "$HOME/.codex" ] && echo "  Codex hooks:     ~/.codex/hooks.json"
 echo "  Systemd service: ~/.config/systemd/user/argus-agenticus.service"
 if [ "$GNOME_INSTALLED" = true ]; then
     echo "  GNOME extension: installed"

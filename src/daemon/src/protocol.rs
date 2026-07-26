@@ -22,6 +22,10 @@ pub enum IncomingMessage {
         tool: String,
         #[serde(default = "default_agent_type")]
         agent_type: String,
+        #[serde(default)]
+        uncommitted_count: Option<u32>,
+        #[serde(default)]
+        multiplexer: Option<String>,
     },
     WindowFocus {
         title: String,
@@ -50,6 +54,15 @@ pub enum IncomingMessage {
     WindowClosed {
         session: String,
     },
+    CycleAutoFocus {
+        session: String,
+    },
+    CycleAutoFocusGroup {
+        group: String,
+    },
+    SetLogLevel {
+        level: String,
+    },
 }
 
 fn default_agent_type() -> String {
@@ -63,13 +76,29 @@ pub struct AgentInfo {
     pub focused: bool,
     pub group: u32,
     pub agent_type: Arc<str>,
+    #[serde(default)]
+    pub tool: String,
+    pub awaiting_since_unix: Option<u64>,
+    pub uncommitted_count: Option<u32>,
+    #[serde(default)]
+    pub auto_focus_mode: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum OutgoingMessage {
     Render { agents: Vec<AgentInfo> },
-    Focus { session: String, agent_type: String },
-    AutoFocus { session: String, agent_type: String },
+    Focus {
+        session: String,
+        agent_type: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        multiplexer: Option<String>,
+    },
+    AutoFocus {
+        session: String,
+        agent_type: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        multiplexer: Option<String>,
+    },
     ReturnWorkspace,
 }

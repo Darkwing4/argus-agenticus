@@ -25,6 +25,19 @@ pub fn msg_state(session: &str, state: AgentState) -> IncomingMessage {
         state,
         tool: to_s("bash"),
         agent_type: to_s("claude"),
+        uncommitted_count: None,
+        multiplexer: None,
+    }
+}
+
+pub fn msg_state_zellij(session: &str, state: AgentState) -> IncomingMessage {
+    IncomingMessage::State {
+        session: to_s(session),
+        state,
+        tool: to_s("bash"),
+        agent_type: to_s("claude"),
+        uncommitted_count: None,
+        multiplexer: Some(to_s("zellij")),
     }
 }
 
@@ -75,6 +88,16 @@ pub fn should_reply_focus(fx: &Effects, session: &str) {
     match &fx.reply {
         Some(OutgoingMessage::Focus { session: s, .. }) => {
             assert_eq!(s, session, "expected Focus for '{session}', got '{s}'");
+        }
+        other => panic!("expected Focus reply for '{session}', got {other:?}"),
+    }
+}
+
+pub fn should_reply_focus_with_multiplexer(fx: &Effects, session: &str, expected_mux: Option<&str>) {
+    match &fx.reply {
+        Some(OutgoingMessage::Focus { session: s, multiplexer, .. }) => {
+            assert_eq!(s, session, "expected Focus for '{session}', got '{s}'");
+            assert_eq!(multiplexer.as_deref(), expected_mux, "multiplexer mismatch");
         }
         other => panic!("expected Focus reply for '{session}', got {other:?}"),
     }

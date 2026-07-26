@@ -1,0 +1,84 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ARGUS_AGENT_TYPE=codex bash ~/.claude/hooks/events-to-socket.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ARGUS_AGENT_TYPE=codex bash ~/.claude/hooks/events-to-socket.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ARGUS_AGENT_TYPE=codex bash ~/.claude/hooks/events-to-socket.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ARGUS_AGENT_TYPE=codex bash ~/.claude/hooks/events-to-socket.sh"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ARGUS_AGENT_TYPE=codex bash ~/.claude/hooks/events-to-socket.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ARGUS_AGENT_TYPE=codex bash ~/.claude/hooks/events-to-socket.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ARGUS_AGENT_TYPE=codex bash ~/.claude/hooks/events-to-socket.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ARGUS_AGENT_TYPE=codex bash ~/.claude/hooks/events-to-socket.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

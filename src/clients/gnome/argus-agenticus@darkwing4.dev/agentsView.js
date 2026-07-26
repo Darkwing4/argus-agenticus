@@ -10,6 +10,9 @@ import { FocusManager } from './focusManager.js';
 import { Renderer } from './renderer.js';
 import { IdleMonitor } from './idleMonitor.js';
 import { updateTerminalWmClasses } from './constants.js';
+import { Logger, setLogLevel } from './logger.js';
+
+const logger = new Logger('agentsView.js');
 
 export const AgentsView = GObject.registerClass(
 class AgentsView extends St.BoxLayout {
@@ -96,13 +99,15 @@ class AgentsView extends St.BoxLayout {
         this._menu.addMenuItem(this._showLabelsSwitch);
 
         this._buildRadioSubMenu(
-            'Dot size',
+            'Log level',
             [
-                { label: 'Small', value: 'small' },
-                { label: 'Medium', value: 'medium' },
-                { label: 'Large', value: 'large' },
+                { label: 'Off', value: 'off' },
+                { label: 'Error', value: 'error' },
+                { label: 'Warn', value: 'warn' },
+                { label: 'Info', value: 'info' },
+                { label: 'Debug', value: 'debug' },
             ],
-            'dot-size'
+            'log-level'
         );
 
         this._buildRadioSubMenu(
@@ -114,6 +119,15 @@ class AgentsView extends St.BoxLayout {
             ],
             'panel-position'
         );
+
+        this._buildSpinnerMenuItem('Dot size', 'dot-size', 4, 20, 2);
+        this._buildSpinnerMenuItem('Dot gap', 'dot-gap', 0, 16, 2);
+        this._buildSpinnerMenuItem('Font size', 'font-size', 8, 20, 1);
+        this._buildSpinnerMenuItem('Group padding', 'group-padding', 0, 16, 2);
+        this._buildSpinnerMenuItem('Hover offset %', 'hover-offset-percent', 0, 200, 10);
+        this._buildSpinnerMenuItem('Hover rise ms', 'hover-rise-ms', 0, 2000, 20);
+        this._buildSpinnerMenuItem('Hover fall ms', 'hover-fall-ms', 0, 2000, 20);
+        this._buildSpinnerMenuItem('A label size %', 'af-label-size-percent', 30, 200, 5);
 
         logo.connect('clicked', () => this._menu.toggle());
     }
@@ -153,13 +167,77 @@ class AgentsView extends St.BoxLayout {
         }
     }
 
+    _buildSpinnerMenuItem(title, settingsKey, min, max, step) {
+        const item = new PopupMenu.PopupBaseMenuItem({ activate: false });
+        const box = new St.BoxLayout({ x_expand: true });
+
+        box.add_child(new St.Label({
+            text: title,
+            y_align: Clutter.ActorAlign.CENTER,
+            x_expand: true,
+        }));
+
+        const decBtn = new St.Button({
+            style_class: 'button',
+            label: '\u25C0',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        const valueLabel = new St.Label({
+            text: `${this._settings.get_int(settingsKey)}`,
+            y_align: Clutter.ActorAlign.CENTER,
+            style: 'min-width: 2em; text-align: center;',
+        });
+
+        const incBtn = new St.Button({
+            style_class: 'button',
+            label: '\u25B6',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        decBtn.connect('clicked', () => {
+            const cur = this._settings.get_int(settingsKey);
+            if (cur - step >= min)
+                this._settings.set_int(settingsKey, cur - step);
+        });
+
+        incBtn.connect('clicked', () => {
+            const cur = this._settings.get_int(settingsKey);
+            if (cur + step <= max)
+                this._settings.set_int(settingsKey, cur + step);
+        });
+
+        box.add_child(decBtn);
+        box.add_child(valueLabel);
+        box.add_child(incBtn);
+
+        item.add_child(box);
+        this._menu.addMenuItem(item);
+
+        const camelKey = settingsKey.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        this[`_${camelKey}Label`] = valueLabel;
+    }
+
     _setupSettings() {
         updateTerminalWmClasses(this._settings.get_strv('terminal-wm-classes'));
         this._autoFocusEnabled = this._settings.get_boolean('auto-focus-enabled');
         this._focusDelayMs = this._settings.get_int('focus-delay-ms');
         this._inputIdleThresholdMs = this._settings.get_int('input-idle-threshold-ms');
-        this._dotSize = this._settings.get_string('dot-size');
+        this._dotSize = this._settings.get_int('dot-size');
+        this._dotGap = this._settings.get_int('dot-gap');
+        this._fontSize = this._settings.get_int('font-size');
+        this._groupPadding = this._settings.get_int('group-padding');
+        this._hoverOffsetPercent = this._settings.get_int('hover-offset-percent');
+        this._hoverRiseMs = this._settings.get_int('hover-rise-ms');
+        this._hoverFallMs = this._settings.get_int('hover-fall-ms');
+        this._afLabelSizePercent = this._settings.get_int('af-label-size-percent');
         this._showLabels = this._settings.get_boolean('show-labels');
+        try {
+            this._logLevel = this._settings.get_string('log-level');
+        } catch(_) {
+            this._logLevel = 'off';
+        }
+        setLogLevel(this._logLevel);
 
         this._settingsChangedId = this._settings.connect('changed', (settings, key) => {
             switch (key) {
@@ -181,8 +259,51 @@ class AgentsView extends St.BoxLayout {
                     this._idleMonitor.updateThreshold(this._inputIdleThresholdMs);
                     break;
                 case 'dot-size':
-                    this._dotSize = settings.get_string(key);
-                    this._updateRadioOrnaments('dot-size', this._dotSize);
+                    this._dotSize = settings.get_int(key);
+                    if (this._dotSizeLabel)
+                        this._dotSizeLabel.text = `${this._dotSize}`;
+                    this._updateDots();
+                    break;
+                case 'dot-gap':
+                    this._dotGap = settings.get_int(key);
+                    if (this._dotGapLabel)
+                        this._dotGapLabel.text = `${this._dotGap}`;
+                    this._updateDots();
+                    break;
+                case 'font-size':
+                    this._fontSize = settings.get_int(key);
+                    if (this._fontSizeLabel)
+                        this._fontSizeLabel.text = `${this._fontSize}`;
+                    this._updateDots();
+                    break;
+                case 'group-padding':
+                    this._groupPadding = settings.get_int(key);
+                    if (this._groupPaddingLabel)
+                        this._groupPaddingLabel.text = `${this._groupPadding}`;
+                    this._updateDots();
+                    break;
+                case 'hover-offset-percent':
+                    this._hoverOffsetPercent = settings.get_int(key);
+                    if (this._hoverOffsetPercentLabel)
+                        this._hoverOffsetPercentLabel.text = `${this._hoverOffsetPercent}`;
+                    this._updateDots();
+                    break;
+                case 'hover-rise-ms':
+                    this._hoverRiseMs = settings.get_int(key);
+                    if (this._hoverRiseMsLabel)
+                        this._hoverRiseMsLabel.text = `${this._hoverRiseMs}`;
+                    this._updateDots();
+                    break;
+                case 'hover-fall-ms':
+                    this._hoverFallMs = settings.get_int(key);
+                    if (this._hoverFallMsLabel)
+                        this._hoverFallMsLabel.text = `${this._hoverFallMs}`;
+                    this._updateDots();
+                    break;
+                case 'af-label-size-percent':
+                    this._afLabelSizePercent = settings.get_int(key);
+                    if (this._afLabelSizePercentLabel)
+                        this._afLabelSizePercentLabel.text = `${this._afLabelSizePercent}`;
                     this._updateDots();
                     break;
                 case 'show-labels':
@@ -193,6 +314,12 @@ class AgentsView extends St.BoxLayout {
                     break;
                 case 'panel-position':
                     this._updateRadioOrnaments('panel-position', settings.get_string(key));
+                    break;
+                case 'log-level':
+                    this._logLevel = settings.get_string(key);
+                    setLogLevel(this._logLevel);
+                    this._updateRadioOrnaments('log-level', this._logLevel);
+                    this._sendLogLevel();
                     break;
             }
         });
@@ -213,6 +340,7 @@ class AgentsView extends St.BoxLayout {
                 this._onFocusWindowChanged();
                 this._focusManager.sendAllWorkspaces((msg) => this._daemon.send(msg));
                 this._sendAutoFocusConfig();
+                this._sendLogLevel();
             })
         );
 
@@ -238,6 +366,7 @@ class AgentsView extends St.BoxLayout {
         };
 
         this._windowTracker.onWorkspaceChanged = () => {
+            this._focusManager.resetWorkspaceCache();
             this._focusManager.sendAllWorkspaces((msg) => this._daemon.send(msg));
             this._focusManager.sendWindowFocus(
                 global.display.get_focus_window(),
@@ -259,6 +388,10 @@ class AgentsView extends St.BoxLayout {
         this._idleMonitor.onActive = () => this._daemon.send({ type: 'idle_status', idle: false });
     }
 
+    _sendLogLevel() {
+        this._daemon.send({ type: 'set_log_level', level: this._logLevel });
+    }
+
     _sendAutoFocusConfig() {
         this._daemon.send({
             type: 'auto_focus_config',
@@ -273,6 +406,7 @@ class AgentsView extends St.BoxLayout {
         if (!win)
             return;
 
+        this._focusManager.handleStackReset(win);
         this._focusManager.sendWindowFocus(win, (msg) => this._daemon.send(msg));
         this._focusManager.sendWorkspaceForWindow(win, (msg) => this._daemon.send(msg));
         this._focusManager.updateOriginalWorkspace(win, this._agents);
@@ -284,6 +418,7 @@ class AgentsView extends St.BoxLayout {
 
             if (msg.type === 'render') {
                 this._agents = msg.agents;
+                logger.log('Render', msg.agents.map(a => `${a.session}(g:${a.group})`).join(', '));
                 this._updateDots();
                 this._tryMapCursorCliWindows();
             } else if (msg.type === 'focus') {
@@ -322,16 +457,37 @@ class AgentsView extends St.BoxLayout {
             onDotClicked: (session) => {
                 this._daemon.send({ type: 'click', session });
             },
+            onDotMiddleClicked: (session) => {
+                this._daemon.send({ type: 'cycle_auto_focus', session });
+            },
+            onGroupAutoFocusClicked: (group) => {
+                this._daemon.send({ type: 'cycle_auto_focus_group', group });
+            },
         }, {
             dotSize: this._dotSize,
+            dotGap: this._dotGap,
+            fontSize: this._fontSize,
+            groupPadding: this._groupPadding,
             showLabels: this._showLabels,
+            hoverOffsetPercent: this._hoverOffsetPercent,
+            hoverRiseMs: this._hoverRiseMs,
+            hoverFallMs: this._hoverFallMs,
+            afLabelSizePercent: this._afLabelSizePercent,
         });
         this._groupsBox.visible = visible;
         this._autoFocusButton.visible = visible;
     }
 
     focusNext() {
+        if (this._agents.length === 0)
+            return;
+        this._focusManager.pushCurrentWindow();
+        this._focusManager.beginNavigation();
         this._daemon.send({ type: 'focus_next' });
+    }
+
+    focusPrev() {
+        this._focusManager.focusPrev();
     }
 
     destroy() {

@@ -4,6 +4,7 @@ mod protocol;
 mod socket;
 mod state;
 mod tasks;
+mod zellij;
 
 use std::env;
 use std::path::PathBuf;

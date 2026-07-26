@@ -6,6 +6,7 @@ use tracing::debug;
 
 use crate::protocol::OutgoingMessage;
 use crate::state::StateManager;
+use crate::zellij;
 
 pub fn spawn_cleanup(state: Arc<Mutex<StateManager>>, tx: broadcast::Sender<OutgoingMessage>) {
     tokio::spawn(async move {
@@ -51,15 +52,19 @@ pub fn spawn_auto_focus(
                             if s.should_auto_focus() {
                                 s.next_awaiting().map(|session| {
                                     let agent_type = s.get_agent_type(&session);
-                                    (session, agent_type)
+                                    let multiplexer = s.get_multiplexer(&session);
+                                    (session, agent_type, multiplexer)
                                 })
                             } else {
                                 None
                             }
                         };
-                        if let Some((session, agent_type)) = result {
+                        if let Some((session, agent_type, multiplexer)) = result {
                             debug!("Auto-focus: {}", session);
-                            let _ = tx.send(OutgoingMessage::AutoFocus { session, agent_type });
+                            if multiplexer.as_deref() == Some("zellij") {
+                                zellij::focus_pane(&session);
+                            }
+                            let _ = tx.send(OutgoingMessage::AutoFocus { session, agent_type, multiplexer });
                         }
                         break;
                     }

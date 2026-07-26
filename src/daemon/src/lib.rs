@@ -5,3 +5,4 @@ pub mod protocol;
 pub mod socket;
 pub mod state;
 pub mod tasks;
+pub mod zellij;

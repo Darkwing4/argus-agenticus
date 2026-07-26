@@ -12,6 +12,7 @@ use tracing::warn;
 use crate::handler;
 use crate::protocol::{IncomingMessage, OutgoingMessage};
 use crate::state::{AutoFocusEvent, StateManager};
+use crate::zellij;
 
 const MAX_LINE_LENGTH: usize = 65_536;
 
@@ -90,6 +91,15 @@ impl Connection {
     ) {
         if effects.mark_extension {
             is_extension.store(true, Ordering::Release);
+        }
+
+        if let Some(ref reply) = effects.reply {
+            match reply {
+                OutgoingMessage::Focus { session, multiplexer: Some(m), .. } if m == "zellij" => {
+                    zellij::focus_pane(session);
+                }
+                _ => {}
+            }
         }
 
         if let Some(reply) = effects.reply {

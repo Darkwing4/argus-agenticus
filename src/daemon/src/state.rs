@@ -1,8 +1,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+use tracing::debug;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::reload;
 
 use crate::protocol::{AgentInfo, AgentState};
+
+pub static LOG_RELOAD_HANDLE: std::sync::OnceLock<reload::Handle<EnvFilter, tracing_subscriber::Registry>> = std::sync::OnceLock::new();
 
 const ENDED_HIDE_DELAY: Duration = Duration::from_secs(10);
 const STALE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -19,14 +25,41 @@ pub enum AutoFocusEvent {
     None,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutoFocusMode {
+    Off,
+    Awaiting,
+    AwaitingCompleted,
+}
+
+impl AutoFocusMode {
+    pub fn as_u8(self) -> u8 {
+        match self {
+            AutoFocusMode::Off => 0,
+            AutoFocusMode::Awaiting => 1,
+            AutoFocusMode::AwaitingCompleted => 2,
+        }
+    }
+
+    pub fn cycle(self) -> Self {
+        match self {
+            AutoFocusMode::Off => AutoFocusMode::Awaiting,
+            AutoFocusMode::Awaiting => AutoFocusMode::AwaitingCompleted,
+            AutoFocusMode::AwaitingCompleted => AutoFocusMode::Off,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SessionInfo {
     pub state: AgentState,
-    #[allow(dead_code)]
     pub tool: String,
     pub agent_type: Arc<str>,
     pub ended_at: Option<Instant>,
     pub last_activity: Instant,
+    pub awaiting_since: Option<Instant>,
+    pub uncommitted_count: Option<u32>,
+    pub multiplexer: Option<Arc<str>>,
 }
 
 pub struct StateManager {
@@ -39,6 +72,8 @@ pub struct StateManager {
     focus_delay_ms: u64,
     user_idle: bool,
     auto_focus_active: bool,
+    per_session_auto_focus: HashMap<String, AutoFocusMode>,
+    last_auto_focused: Option<String>,
 }
 
 impl StateManager {
@@ -53,10 +88,12 @@ impl StateManager {
             focus_delay_ms: 1000,
             user_idle: false,
             auto_focus_active: false,
+            per_session_auto_focus: HashMap::new(),
+            last_auto_focused: None,
         }
     }
 
-    pub fn update_state(&mut self, session: String, state: AgentState, tool: String, agent_type: Arc<str>) -> AutoFocusEvent {
+    pub fn update_state(&mut self, session: String, state: AgentState, tool: String, agent_type: Arc<str>, uncommitted_count: Option<u32>, multiplexer: Option<Arc<str>>) -> AutoFocusEvent {
         let prev_state = self.sessions.get(&session).map(|s| s.state);
 
         let ended_at = if state == AgentState::Ended {
@@ -73,6 +110,22 @@ impl StateManager {
             }
         }
 
+        let awaiting_since = if actual_state == AgentState::Awaiting {
+            if prev_state == Some(AgentState::Awaiting) {
+                self.sessions.get(&session).and_then(|s| s.awaiting_since)
+            } else {
+                Some(Instant::now())
+            }
+        } else {
+            None
+        };
+
+        let uncommitted_count = uncommitted_count
+            .or_else(|| self.sessions.get(&session).and_then(|s| s.uncommitted_count));
+
+        let multiplexer = multiplexer
+            .or_else(|| self.sessions.get(&session).and_then(|s| s.multiplexer.clone()));
+
         self.sessions.insert(
             session.clone(),
             SessionInfo {
@@ -81,6 +134,9 @@ impl StateManager {
                 agent_type,
                 ended_at,
                 last_activity: Instant::now(),
+                awaiting_since,
+                uncommitted_count,
+                multiplexer,
             },
         );
 
@@ -88,6 +144,10 @@ impl StateManager {
             && prev_state != Some(AgentState::Awaiting);
         let left_awaiting = actual_state != AgentState::Awaiting
             && prev_state == Some(AgentState::Awaiting);
+        let became_completed = actual_state == AgentState::Completed
+            && prev_state != Some(AgentState::Completed);
+        let left_completed = actual_state != AgentState::Completed
+            && prev_state == Some(AgentState::Completed);
 
         if became_awaiting {
             if !self.awaiting_queue.contains(&session) {
@@ -96,13 +156,32 @@ impl StateManager {
             return AutoFocusEvent::Trigger;
         }
 
-        if left_awaiting || actual_state == AgentState::Ended {
+        let mode = self
+            .per_session_auto_focus
+            .get(&session)
+            .copied()
+            .unwrap_or(AutoFocusMode::Off);
+
+        if became_completed && mode == AutoFocusMode::AwaitingCompleted {
+            if !self.awaiting_queue.contains(&session) {
+                self.awaiting_queue.push(session);
+            }
+            return AutoFocusEvent::Trigger;
+        }
+
+        if left_awaiting || left_completed || actual_state == AgentState::Ended {
             self.awaiting_queue.retain(|s| s != &session);
-            if self.awaiting_queue.is_empty() && self.auto_focus_active {
+            if actual_state == AgentState::Ended {
+                self.per_session_auto_focus.remove(&session);
+            }
+            if self.last_auto_focused.as_deref() == Some(&session) {
+                self.last_auto_focused = None;
+            }
+            if !self.has_eligible_in_queue() && self.auto_focus_active {
                 self.auto_focus_active = false;
                 return AutoFocusEvent::QueueEmpty;
             }
-            if left_awaiting {
+            if left_awaiting || left_completed {
                 return AutoFocusEvent::Trigger;
             }
         }
@@ -110,11 +189,12 @@ impl StateManager {
         AutoFocusEvent::None
     }
 
-    pub fn update_window_focus(&mut self, title: &str, agent_type: Option<&str>) -> bool {
-        let new_focused = self
-            .sessions
-            .keys()
-            .find(|s| title.contains(Self::get_group(s)))
+    pub fn update_window_focus(&mut self, title: &str, agent_type: Option<&str>) -> (bool, AutoFocusEvent) {
+        let mut keys: Vec<&String> = self.sessions.keys().collect();
+        keys.sort();
+        let new_focused = keys
+            .iter()
+            .find(|s| Self::title_matches_group(title, Self::get_group(s)))
             .map(|s| Self::get_group(s).to_string())
             .or_else(|| {
                 let at = agent_type.filter(|a| !a.is_empty())?;
@@ -125,7 +205,7 @@ impl StateManager {
             });
 
         let changed = self.focused_group != new_focused;
-        self.focused_group = new_focused;
+        self.focused_group = new_focused.clone();
 
         if let Some(ref group) = self.focused_group {
             for (session, info) in self.sessions.iter_mut() {
@@ -137,13 +217,103 @@ impl StateManager {
             }
         }
 
-        changed
+        let af_event = self.check_auto_focus_dismissal();
+
+        (changed, af_event)
     }
 
-    pub fn remove_session(&mut self, session: &str) -> bool {
+    fn check_auto_focus_dismissal(&mut self) -> AutoFocusEvent {
+        let session = match self.last_auto_focused.take() {
+            Some(s) => s,
+            None => return AutoFocusEvent::None,
+        };
+
+        let session_group = Self::get_group(&session);
+        if self.focused_group.as_deref() == Some(session_group) {
+            self.last_auto_focused = Some(session);
+            return AutoFocusEvent::None;
+        }
+
+        self.awaiting_queue.retain(|s| s != &session);
+
+        if !self.has_eligible_in_queue() && self.auto_focus_active {
+            self.auto_focus_active = false;
+            return AutoFocusEvent::QueueEmpty;
+        }
+
+        AutoFocusEvent::None
+    }
+
+    pub fn cycle_auto_focus(&mut self, session: &str) -> AutoFocusMode {
+        let current = self
+            .per_session_auto_focus
+            .get(session)
+            .copied()
+            .unwrap_or(AutoFocusMode::Off);
+        let next = current.cycle();
+        if next == AutoFocusMode::Off {
+            self.per_session_auto_focus.remove(session);
+        } else {
+            self.per_session_auto_focus.insert(session.to_string(), next);
+        }
+        next
+    }
+
+    pub fn cycle_auto_focus_group(&mut self, group: &str) -> AutoFocusMode {
+        let sessions: Vec<String> = self
+            .sessions
+            .keys()
+            .filter(|s| Self::get_group(s) == group)
+            .cloned()
+            .collect();
+        if sessions.is_empty() {
+            return AutoFocusMode::Off;
+        }
+        let min_u8 = sessions
+            .iter()
+            .map(|s| {
+                self.per_session_auto_focus
+                    .get(s)
+                    .copied()
+                    .unwrap_or(AutoFocusMode::Off)
+                    .as_u8()
+            })
+            .min()
+            .unwrap_or(0);
+        let current = match min_u8 {
+            0 => AutoFocusMode::Off,
+            1 => AutoFocusMode::Awaiting,
+            _ => AutoFocusMode::AwaitingCompleted,
+        };
+        let next = current.cycle();
+        for s in &sessions {
+            if next == AutoFocusMode::Off {
+                self.per_session_auto_focus.remove(s);
+            } else {
+                self.per_session_auto_focus.insert(s.clone(), next);
+            }
+        }
+        next
+    }
+
+    pub fn remove_session(&mut self, session: &str) -> (bool, AutoFocusEvent) {
         self.awaiting_queue.retain(|s| s != session);
-        self.workspaces.remove(session);
-        self.sessions.remove(session).is_some()
+        self.per_session_auto_focus.remove(session);
+        if self.last_auto_focused.as_deref() == Some(session) {
+            self.last_auto_focused = None;
+        }
+        let removed = self.sessions.remove(session).is_some();
+        let group = Self::get_group(session);
+        if removed && !self.sessions.keys().any(|k| Self::get_group(k) == group) {
+            self.workspaces.remove(group);
+        }
+        let af_event = if !self.has_eligible_in_queue() && self.auto_focus_active {
+            self.auto_focus_active = false;
+            AutoFocusEvent::QueueEmpty
+        } else {
+            AutoFocusEvent::None
+        };
+        (removed, af_event)
     }
 
     pub fn get_agent_type(&self, session: &str) -> String {
@@ -151,6 +321,13 @@ impl StateManager {
             .get(session)
             .map(|info| info.agent_type.to_string())
             .unwrap_or_default()
+    }
+
+    pub fn get_multiplexer(&self, session: &str) -> Option<String> {
+        self.sessions
+            .get(session)
+            .and_then(|info| info.multiplexer.as_ref())
+            .map(|m| m.to_string())
     }
 
     pub fn cleanup_ended(&mut self) -> bool {
@@ -171,9 +348,16 @@ impl StateManager {
         }
 
         let before = self.sessions.len();
-        self.sessions.retain(|_, info| {
+        self.sessions.retain(|session, info| {
             if let Some(ended_at) = info.ended_at {
-                return now.duration_since(ended_at) < ENDED_HIDE_DELAY;
+                if now.duration_since(ended_at) >= ENDED_HIDE_DELAY {
+                    self.per_session_auto_focus.remove(session);
+                    self.awaiting_queue.retain(|s| s != session);
+                    if self.last_auto_focused.as_deref() == Some(session) {
+                        self.last_auto_focused = None;
+                    }
+                    return false;
+                }
             }
             true
         });
@@ -182,12 +366,22 @@ impl StateManager {
     }
 
     pub fn update_workspace(&mut self, session: &str, workspace: u32, monitor: u32) {
-        let group = Self::get_group(session);
-        self.workspaces.insert(group.to_string(), (workspace, monitor));
+        let group = Self::get_group(session).to_string();
+        self.workspaces.retain(|k, _| Self::get_group(k) != group);
+        self.workspaces.insert(group, (workspace, monitor));
     }
 
     fn get_placement(&self, session: &str) -> (u32, u32) {
-        self.workspaces.get(session).copied().unwrap_or((999, 0))
+        if let Some(&p) = self.workspaces.get(session) {
+            return p;
+        }
+        let group = Self::get_group(session);
+        if group != session {
+            if let Some(&p) = self.workspaces.get(group) {
+                return p;
+            }
+        }
+        (999, 0)
     }
 
     pub fn set_idle(&mut self, idle: bool) {
@@ -200,7 +394,28 @@ impl StateManager {
     }
 
     pub fn should_auto_focus(&self) -> bool {
-        self.auto_focus_enabled && self.user_idle && !self.awaiting_queue.is_empty()
+        self.user_idle && self.has_eligible_in_queue()
+    }
+
+    fn is_session_eligible(&self, session: &str) -> bool {
+        let info = match self.sessions.get(session) {
+            Some(i) => i,
+            None => return false,
+        };
+        let mode = self
+            .per_session_auto_focus
+            .get(session)
+            .copied()
+            .unwrap_or(AutoFocusMode::Off);
+        match info.state {
+            AgentState::Awaiting => self.auto_focus_enabled || mode != AutoFocusMode::Off,
+            AgentState::Completed => mode == AutoFocusMode::AwaitingCompleted,
+            _ => false,
+        }
+    }
+
+    fn has_eligible_in_queue(&self) -> bool {
+        self.awaiting_queue.iter().any(|s| self.is_session_eligible(s))
     }
 
     pub fn focus_delay_ms(&self) -> u64 {
@@ -208,17 +423,21 @@ impl StateManager {
     }
 
     pub fn next_awaiting(&mut self) -> Option<String> {
-        if self.awaiting_queue.is_empty() {
-            return None;
-        }
+        let session = self.awaiting_queue
+            .iter()
+            .find(|s| self.is_session_eligible(s))?
+            .clone();
         self.auto_focus_active = true;
-        Some(self.awaiting_queue[0].clone())
+        self.last_auto_focused = Some(session.clone());
+        Some(session)
     }
 
     pub fn clear_all(&mut self) {
         self.sessions.clear();
         self.workspaces.clear();
         self.awaiting_queue.clear();
+        self.per_session_auto_focus.clear();
+        self.last_auto_focused = None;
         self.focused_group = None;
         self.last_focus_index = 0;
     }
@@ -235,8 +454,8 @@ impl StateManager {
     pub fn get_render_data(&self) -> Vec<AgentInfo> {
         let mut keys: Vec<&String> = self.sessions.keys().collect();
         keys.sort_by(|a, b| {
-            let (ws_a, mon_a) = self.get_placement(Self::get_group(a));
-            let (ws_b, mon_b) = self.get_placement(Self::get_group(b));
+            let (ws_a, mon_a) = self.get_placement(a);
+            let (ws_b, mon_b) = self.get_placement(b);
             mon_a.cmp(&mon_b).then(ws_a.cmp(&ws_b)).then_with(|| a.cmp(b))
         });
 
@@ -254,13 +473,35 @@ impl StateManager {
                 prev_group = Some(g);
             }
             let focused = self.focused_group.as_deref() == Some(g);
+            let awaiting_since_unix = info.awaiting_since.map(|instant| {
+                let elapsed = instant.elapsed();
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .saturating_sub(elapsed)
+                    .as_secs()
+            });
             agents.push(AgentInfo {
                 session: session.clone(),
                 state: info.state,
                 focused,
                 group,
                 agent_type: info.agent_type.clone(),
+                tool: info.tool.clone(),
+                awaiting_since_unix,
+                uncommitted_count: info.uncommitted_count,
+                auto_focus_mode: self
+                    .per_session_auto_focus
+                    .get(session)
+                    .copied()
+                    .unwrap_or(AutoFocusMode::Off)
+                    .as_u8(),
             });
+        }
+
+        for agent in &agents {
+            let (ws, mon) = self.get_placement(&agent.session);
+            debug!("[sort] {} g:{} ws:{} mon:{}", agent.session, agent.group, ws, mon);
         }
 
         agents
@@ -280,8 +521,8 @@ impl StateManager {
             }
 
             matching.sort_by(|a, b| {
-                let (ws_a, mon_a) = self.get_placement(Self::get_group(a));
-                let (ws_b, mon_b) = self.get_placement(Self::get_group(b));
+                let (ws_a, mon_a) = self.get_placement(a);
+                let (ws_b, mon_b) = self.get_placement(b);
                 mon_a.cmp(&mon_b).then(ws_a.cmp(&ws_b)).then_with(|| a.cmp(b))
             });
 
@@ -289,6 +530,27 @@ impl StateManager {
             return Some(matching[self.last_focus_index].clone());
         }
         None
+    }
+
+    fn title_matches_group(title: &str, group: &str) -> bool {
+        let mut start = 0;
+        while let Some(pos) = title[start..].find(group) {
+            let abs_pos = start + pos;
+            let before_ok = abs_pos == 0 || {
+                let ch = title.as_bytes()[abs_pos - 1];
+                !ch.is_ascii_alphanumeric() && ch != b'_' && ch != b'.' && ch != b'-'
+            };
+            let after_pos = abs_pos + group.len();
+            let after_ok = after_pos >= title.len() || {
+                let ch = title.as_bytes()[after_pos];
+                !ch.is_ascii_alphanumeric() && ch != b'_' && ch != b'.' && ch != b'-'
+            };
+            if before_ok && after_ok {
+                return true;
+            }
+            start = abs_pos + title[abs_pos..].chars().next().map_or(1, |c| c.len_utf8());
+        }
+        false
     }
 
     fn get_group(session: &str) -> &str {

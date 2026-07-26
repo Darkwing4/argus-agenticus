@@ -1,8 +1,11 @@
+import Gio from 'gi://Gio';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import { AgentsView } from './agentsView.js';
+
+const MEDIA_KEYS_SCHEMA = 'org.gnome.settings-daemon.plugins.media-keys';
 
 const PANEL_BOXES = {
     'left': () => Main.panel._leftBox,
@@ -30,11 +33,23 @@ export default class AgentsMonitorV2Extension extends Extension {
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
             () => this._view.focusNext()
         );
+
+        this._disableSystemHelp();
+
+        Main.wm.addKeybinding(
+            'focus-prev-return',
+            this._settings,
+            Meta.KeyBindingFlags.NONE,
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
+            () => this._view.focusPrev()
+        );
     }
 
     disable() {
         console.log('Argus Agenticus: disabling');
         Main.wm.removeKeybinding('focus-next-awaiting');
+        Main.wm.removeKeybinding('focus-prev-return');
+        this._restoreSystemHelp();
 
         if (this._positionChangedId) {
             this._settings.disconnect(this._positionChangedId);
@@ -58,5 +73,27 @@ export default class AgentsMonitorV2Extension extends Extension {
     _removeFromPanel() {
         if (this._currentBox && this._view)
             this._currentBox.remove_child(this._view);
+    }
+
+    _disableSystemHelp() {
+        try {
+            this._mediaKeysSettings = new Gio.Settings({ schema_id: MEDIA_KEYS_SCHEMA });
+            this._savedHelp = this._mediaKeysSettings.get_strv('help');
+            this._mediaKeysSettings.set_strv('help', ['']);
+        } catch (e) {
+            console.log(`Argus Agenticus: could not disable system help key: ${e.message}`);
+        }
+    }
+
+    _restoreSystemHelp() {
+        if (this._mediaKeysSettings && this._savedHelp) {
+            try {
+                this._mediaKeysSettings.set_strv('help', this._savedHelp);
+            } catch (e) {
+                console.log(`Argus Agenticus: could not restore system help key: ${e.message}`);
+            }
+        }
+        this._mediaKeysSettings = null;
+        this._savedHelp = null;
     }
 }

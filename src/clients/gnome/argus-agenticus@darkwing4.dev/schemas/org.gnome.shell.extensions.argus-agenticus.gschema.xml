@@ -6,6 +6,10 @@
       <default><![CDATA[['<Super>F2']]]></default>
     </key>
 
+    <key type="as" name="focus-prev-return">
+      <default><![CDATA[['<Super>F1']]]></default>
+    </key>
+
     <key type="b" name="auto-focus-enabled">
       <default>false</default>
     </key>
@@ -24,16 +28,56 @@
       <default>'left'</default>
     </key>
 
-    <key type="s" name="dot-size">
-      <default>'medium'</default>
+    <key type="i" name="dot-size">
+      <default>10</default>
+      <range min="4" max="20"/>
+    </key>
+
+    <key type="i" name="font-size">
+      <default>11</default>
+      <range min="8" max="20"/>
+    </key>
+
+    <key type="i" name="group-padding">
+      <default>0</default>
+      <range min="0" max="16"/>
+    </key>
+
+    <key type="i" name="dot-gap">
+      <default>4</default>
+      <range min="0" max="16"/>
     </key>
 
     <key type="b" name="show-labels">
       <default>false</default>
     </key>
 
+    <key type="i" name="hover-offset-percent">
+      <default>40</default>
+      <range min="0" max="200"/>
+    </key>
+
+    <key type="i" name="hover-rise-ms">
+      <default>160</default>
+      <range min="0" max="2000"/>
+    </key>
+
+    <key type="i" name="hover-fall-ms">
+      <default>380</default>
+      <range min="0" max="2000"/>
+    </key>
+
+    <key type="i" name="af-label-size-percent">
+      <default>80</default>
+      <range min="30" max="200"/>
+    </key>
+
+    <key type="s" name="log-level">
+      <default>'off'</default>
+    </key>
+
     <key type="as" name="terminal-wm-classes">
-      <default><![CDATA[['Ptyxis', 'org.gnome.Ptyxis', 'Alacritty', 'kitty', 'foot', 'org.wezfurlong.wezterm', 'Gnome-terminal', 'gnome-terminal-server', 'Tilix', 'com.raggesilver.BlackBox']]]></default>
+      <default><![CDATA[['Ptyxis', 'org.gnome.Ptyxis', 'Alacritty', 'kitty', 'foot', 'org.wezfurlong.wezterm', 'zellij-session', 'Gnome-terminal', 'gnome-terminal-server', 'Tilix', 'com.raggesilver.BlackBox']]]></default>
     </key>
   </schema>
 </schemalist>

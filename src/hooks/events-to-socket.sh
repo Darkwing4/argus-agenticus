@@ -1,11 +1,26 @@
 #!/bin/bash
+ARGUS_HOOK_LOG="${XDG_RUNTIME_DIR:-/tmp}/argus-agenticus/hook-stderr.log"
+mkdir -p "$(dirname "$ARGUS_HOOK_LOG")" 2>/dev/null
+exec >/dev/null 2>>"$ARGUS_HOOK_LOG"
+trap 'exit 0' EXIT
+command -v jq >/dev/null 2>&1 || exit 0
 INPUT=$(timeout 1 cat 2>/dev/null || echo '{}')
 read -r EVENT TOOL IS_INTERRUPT <<< $(echo "$INPUT" | jq -r '[.hook_event_name // "unknown", .tool_name // "", .is_interrupt // false] | @tsv')
+CWD=$(echo "$INPUT" | jq -r '.cwd // ""')
 
 LOG="${XDG_RUNTIME_DIR:-/tmp}/argus-agenticus/hook.log"
 
-if echo "$INPUT" | jq -e '.cursor_version' > /dev/null 2>&1; then
-    AGENT_TYPE="cursor"
+AGENT_TYPE="${ARGUS_AGENT_TYPE:-}"
+if [ -z "$AGENT_TYPE" ]; then
+    if echo "$INPUT" | jq -e '.cursor_version' > /dev/null 2>&1; then
+        AGENT_TYPE="cursor"
+    else
+        AGENT_TYPE="claude"
+    fi
+fi
+
+case "$AGENT_TYPE" in
+  cursor)
     CONV_ID=$(echo "$INPUT" | jq -r '.conversation_id // "unknown"')
     WORKSPACE=$(echo "$INPUT" | jq -r '.workspace_roots[0] // empty')
     if [ -n "$ZELLIJ_SESSION_NAME" ]; then
@@ -16,8 +31,17 @@ if echo "$INPUT" | jq -e '.cursor_version' > /dev/null 2>&1; then
     else
         SESSION="cursor#${CONV_ID:0:8}"
     fi
-else
-    AGENT_TYPE="claude"
+    ;;
+  codex)
+    SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
+    if [ -n "$ZELLIJ_SESSION_NAME" ]; then
+        SESSION="${ZELLIJ_SESSION_NAME}#${ZELLIJ_PANE_ID:-0}-cdx"
+    else
+        NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || echo "${CWD:-$PWD}")")
+        SESSION="${NAME}#cdx-${SESSION_ID:0:8}"
+    fi
+    ;;
+  *)
     if [ -n "$ZELLIJ_SESSION_NAME" ]; then
         SESSION="${ZELLIJ_SESSION_NAME}#${ZELLIJ_PANE_ID:-0}"
     else
@@ -29,6 +53,16 @@ else
             SESSION="standalone#0"
         fi
     fi
+    ;;
+esac
+
+if [ -z "$CWD" ] && [ -n "$WORKSPACE" ]; then
+    CWD="$WORKSPACE"
+fi
+UNCOMMITTED=0
+if [ -n "$CWD" ]; then
+    UNCOMMITTED=$(timeout 1 git -C "$CWD" status --short 2>/dev/null | wc -l | tr -d ' ' 2>/dev/null || echo 0)
+    [[ "$UNCOMMITTED" =~ ^[0-9]+$ ]] || UNCOMMITTED=0
 fi
 
 case "$EVENT" in
@@ -54,11 +88,13 @@ case "$EVENT" in
 esac
 
 if [ -z "$ZELLIJ_SESSION_NAME" ]; then
-    printf '\033]0;Argus (%s)\a' "$SESSION" > /dev/tty 2>/dev/null || true
+    { printf '\033]0;Argus (%s)\a' "$SESSION" > /dev/tty; } 2>/dev/null || true
 fi
 
 SOCK="${XDG_RUNTIME_DIR:-/tmp}/agents-monitor/daemon.sock"
-MSG="{\"type\":\"state\",\"session\":\"$SESSION\",\"state\":\"$STATE\",\"tool\":\"$TOOL\",\"agent_type\":\"$AGENT_TYPE\"}"
+MUX=""
+[ -n "$ZELLIJ_SESSION_NAME" ] && MUX=",\"multiplexer\":\"zellij\""
+MSG="{\"type\":\"state\",\"session\":\"$SESSION\",\"state\":\"$STATE\",\"tool\":\"$TOOL\",\"agent_type\":\"$AGENT_TYPE\",\"uncommitted_count\":$UNCOMMITTED${MUX}}"
 
 [ "${ARGUS_DEBUG:-}" = "1" ] && mkdir -p "$(dirname "$LOG")" && echo "$(date '+%H:%M:%S') $AGENT_TYPE $SESSION $STATE event=$EVENT tool=$TOOL" >> "$LOG" 2>/dev/null
 
